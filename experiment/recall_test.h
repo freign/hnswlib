@@ -3,26 +3,9 @@
 #include "../hnswlib/hnswlib.h"
 #include "data_loader.h"
 #include "calc_group_truth.h"
+#include "config.h"
+#include "timer.h"
 #include <fstream>
-
-class StopW {
-    std::chrono::steady_clock::time_point time_begin;
- public:
-    StopW() {
-        time_begin = std::chrono::steady_clock::now();
-    }
-
-    float getElapsedTimeMicro() {
-        std::chrono::steady_clock::time_point time_end = std::chrono::steady_clock::now();
-        return (std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count());
-    }
-
-    void reset() {
-        time_begin = std::chrono::steady_clock::now();
-    }
-};
-
-
 
 template<typename dist_t>
 float test_approx(
@@ -35,8 +18,7 @@ float test_approx(
     
     double recall = 0;
     for (int i = 0; i < qsize; i++) {
-        auto result = appr_alg->searchKnn(query_data_loader->point_data(i),
-            K);
+        auto result = appr_alg->searchKnn(query_data_loader->point_data(i), K);
         recall += gt_loader->calc_recall(result, i, K);
     }
     return recall / qsize;
@@ -89,6 +71,7 @@ void test_vs_recall(
             break;
         }
         file.flush();
+
     }
 
 }

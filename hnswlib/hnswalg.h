@@ -1,6 +1,7 @@
 #pragma once
 
 #include "visited_list_pool.h"
+#include "../experiment/config.h"
 #include "hnswlib.h"
 #include <atomic>
 #include <random>
@@ -70,6 +71,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::mutex deleted_elements_lock;  // lock for deleted_elements
     std::unordered_set<tableint> deleted_elements;  // contains internal ids of deleted elements
 
+    Config *config;
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
@@ -314,6 +316,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         size_t ef,
         BaseFilterFunctor* isIdAllowed = nullptr,
         BaseSearchStopCondition<dist_t>* stop_condition = nullptr) const {
+
+
+        StopW search_timer;
+        config->reset_timer(search_timer);
+
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
         vl_type visited_array_tag = vl->curV;
@@ -339,7 +346,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_array[ep_id] = visited_array_tag;
 
+        StopW timer;
+
+
         while (!candidate_set.empty()) {
+            config->reset_timer(timer);
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
             dist_t candidate_dist = -current_node_pair.first;
 
@@ -433,9 +444,14 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     }
                 }
             }
+            config->add_time(timer, config->dist_func_time);
         }
 
+
         visited_list_pool_->releaseVisitedList(vl);
+
+        config->add_time(search_timer, config->search_time);
+
         return top_candidates;
     }
 

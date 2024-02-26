@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.0...3.26)
 
+set(CMAKE_CXX_STANDARD 17) # 设置C++标准为C++17
+set(CMAKE_CXX_STANDARD_REQUIRED ON) # 确保编译器支持C++17
+
 project(hnswlib
     LANGUAGES CXX)
 
@@ -32,7 +35,7 @@ else()
     option(HNSWLIB_EXAMPLES "Build examples and tests." OFF)
 endif()
 if(HNSWLIB_EXAMPLES)
-    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD 17)
 
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
       SET( CMAKE_CXX_FLAGS  "-Ofast -std=c++11 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
@@ -102,4 +105,9 @@ if(HNSWLIB_EXAMPLES)
 
     add_executable(main tests/cpp/main.cpp tests/cpp/sift_1b.cpp)
     target_link_libraries(main hnswlib)
+    
+    include_directories(${CMAKE_SOURCE_DIR}/hnswlib)
+    add_executable(experiment experiment/experiment.cpp 
+      experiment/data_loader.cpp)
+    target_link_libraries(experiment hnswlib)
 endif()

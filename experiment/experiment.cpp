@@ -36,7 +36,6 @@ public:
 
         alg_hnsw = new hnswlib::HierarchicalNSW<dist_t>(space, max_elements, M, ef_construction);
         alg_hnsw->config = config;
-        config->dist_func_time = 0;
         for (int i = 0; i < data_loader->get_elements(); i++) {
             alg_hnsw->addPoint(data_loader->point_data(i), i);
         }
@@ -44,7 +43,8 @@ public:
     }
 
     ~RecallTester() {
-        delete data_loader;
+        if (data_loader != nullptr)
+            delete data_loader;
         delete query_data_loader;
         delete gt_loader;
         delete alg_hnsw;
@@ -53,6 +53,16 @@ public:
 
     void test() {
         test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
+    }
+
+    void test_search() {
+        cout << "ef\t tot cands\t waste cands\t ratio\n";
+        for (int ef = 10; ef <= 100; ef += 10) {
+            config->clear_cand();
+            alg_hnsw->setEf(ef);
+            float recall = test_approx(query_data_loader, gt_loader, alg_hnsw, 10);
+            cout << ef << "\t" << config->tot_cand_nodes << "\t" << config->wasted_cand_nodes << "\t" << 1.0 * config->wasted_cand_nodes / config->tot_cand_nodes << '\n';
+        }
     }
 private:
     string data_dir;
@@ -71,15 +81,13 @@ private:
 
 template<typename dist_t>
 void begin_tst(RecallTester<dist_t> *rt, Config *config) {
-
-    config->clear_search_time();
-    config->clear_dist_func_time();
-    config->tick = 0;
-
+    
+    config->clear_cand();
+    config->statis_wasted_cand = 1;
     rt->test();
+    // rt->test_search();
+    
 
-    cout << "search time: " << config->search_time << '\n';
-    cout << "dist time: " << config->dist_func_time << '\n';
     delete rt;
 }
 
@@ -97,7 +105,6 @@ int main(int argc, char *argv[]) {
     GroundTruth::GT_Loader *gt_loader;
 
     Config *config = new Config();
-    config->test_dist_func_time = 1;
 
     if (opt.dataName == "bigann") {
         data_loader = new DataLoader("u8", opt.maxElements, opt.point_data_path);

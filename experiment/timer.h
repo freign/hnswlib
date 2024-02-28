@@ -10,7 +10,7 @@ class StopW {
 
     float getElapsedTimeMicro() {
         std::chrono::high_resolution_clock::time_point time_end = std::chrono::high_resolution_clock::now();
-        return (std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_begin).count());
+        return (std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count());
     }
 
     void reset() {

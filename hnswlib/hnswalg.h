@@ -280,6 +280,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
 #endif
                 if (visited_array[candidate_id] == visited_array_tag) continue;
+
+                
+
                 visited_array[candidate_id] = visited_array_tag;
                 char *currObj1 = (getDataByInternalId(candidate_id));
 
@@ -319,7 +322,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
 
         StopW search_timer;
-        config->reset_timer(search_timer);
 
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
@@ -348,9 +350,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         StopW timer;
 
+        if (config->statis_wasted_cand) {
+            config->tot_cand_nodes += candidate_set.size();
+            config->wasted_cand_nodes += candidate_set.size();
+        }
 
         while (!candidate_set.empty()) {
-            config->reset_timer(timer);
+
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
             dist_t candidate_dist = -current_node_pair.first;
 
@@ -369,6 +375,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
             candidate_set.pop();
 
+            if (config->statis_wasted_cand) {
+                config->wasted_cand_nodes--;
+            }
+
             tableint current_node_id = current_node_pair.second;
             int *data = (int *) get_linklist0(current_node_id);
             size_t size = getListCount((linklistsizeint*)data);
@@ -378,12 +388,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 metric_distance_computations+=size;
             }
 
+
 #ifdef USE_SSE
             _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
             _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
             _mm_prefetch(data_level0_memory_ + (*(data + 1)) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
             _mm_prefetch((char *) (data + 2), _MM_HINT_T0);
 #endif
+
+
 
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
@@ -393,8 +406,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
                                 _MM_HINT_T0);  ////////////
 #endif
+            
+
                 if (!(visited_array[candidate_id] == visited_array_tag)) {
                     visited_array[candidate_id] = visited_array_tag;
+
 
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
@@ -408,6 +424,12 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                     if (flag_consider_candidate) {
                         candidate_set.emplace(-dist, candidate_id);
+
+                        if (config->statis_wasted_cand) {
+                            config->tot_cand_nodes++;
+                            config->wasted_cand_nodes++;
+                        }
+
 #ifdef USE_SSE
                         _mm_prefetch(data_level0_memory_ + candidate_set.top().second * size_data_per_element_ +
                                         offsetLevel0_,  ///////////
@@ -444,13 +466,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     }
                 }
             }
-            config->add_time(timer, config->dist_func_time);
         }
 
 
         visited_list_pool_->releaseVisitedList(vl);
-
-        config->add_time(search_timer, config->search_time);
 
         return top_candidates;
     }
@@ -1203,7 +1222,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         int curlevel = getRandomLevel(mult_);
         if (level > 0)
             curlevel = level;
-
+            
         element_levels_[cur_c] = curlevel;
 
         std::unique_lock <std::mutex> templock(global);

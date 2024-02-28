@@ -319,8 +319,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         size_t ef,
         BaseFilterFunctor* isIdAllowed = nullptr,
         BaseSearchStopCondition<dist_t>* stop_condition = nullptr) const {
-
-
+        
         StopW search_timer;
 
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
@@ -352,7 +351,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         if (config->statis_wasted_cand) {
             config->tot_cand_nodes += candidate_set.size();
-            config->wasted_cand_nodes += candidate_set.size();
         }
 
         while (!candidate_set.empty()) {
@@ -375,11 +373,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
             candidate_set.pop();
 
-            if (config->statis_wasted_cand) {
-                config->wasted_cand_nodes--;
+            tableint current_node_id = current_node_pair.second;
+
+            if (config->statis_used_neighbor_dist) {
+                config->used_points_id.insert(current_node_id);
+                config->used_points.push_back(current_node_id);
             }
 
-            tableint current_node_id = current_node_pair.second;
             int *data = (int *) get_linklist0(current_node_id);
             size_t size = getListCount((linklistsizeint*)data);
 //                bool cur_node_deleted = isMarkedDeleted(current_node_id);
@@ -415,6 +415,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
 
+                    if (config->statis_wasted_cand) {
+                        config->tot_calculated_nodes++;
+                    }
+
+                    if (config->statis_used_neighbor_dist) {
+                        if (config->all_points.find(candidate_id) != config->all_points.end()) {
+                            exit(-1);
+                        }
+                        config->all_points.insert(candidate_id);
+                    }
+
                     bool flag_consider_candidate;
                     if (!bare_bone_search && stop_condition) {
                         flag_consider_candidate = stop_condition->should_consider_candidate(dist, lowerBound);
@@ -427,7 +438,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                         if (config->statis_wasted_cand) {
                             config->tot_cand_nodes++;
-                            config->wasted_cand_nodes++;
                         }
 
 #ifdef USE_SSE
@@ -468,7 +478,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
         }
 
-
+        if (config->statis_wasted_cand) {
+            // sum reset candidates
+            config->wasted_cand_nodes += candidate_set.size();
+        }
         visited_list_pool_->releaseVisitedList(vl);
 
         return top_candidates;

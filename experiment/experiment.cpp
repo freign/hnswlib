@@ -40,6 +40,7 @@ public:
             alg_hnsw->addPoint(data_loader->point_data(i), i);
         }
 
+        data_loader->free_data();
     }
 
     ~RecallTester() {

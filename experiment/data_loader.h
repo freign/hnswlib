@@ -19,13 +19,14 @@ public:
 
     uint32_t get_elements();
     uint32_t get_dim();
+    void free_data();
 private:
 
+    void *data;
     int dim;
     uint32_t elements;
     uint64_t data_type_len;
     uint64_t tot_data_size;
     std::string data_path;
-    void *data;
 };
 }

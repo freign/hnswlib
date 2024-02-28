@@ -40,10 +40,20 @@ DataLoader::DataLoader(std::string data_type_name, uint32_t _max_elements, std::
 }
 
 DataLoader::~DataLoader() {
-    if (data != nullptr)
+    if (data != nullptr) {
         free(data);
+        data = nullptr;
+    }
 }
 
 uint32_t DataLoader::get_elements() { return elements; }
 
 uint32_t DataLoader::get_dim() { return dim; }
+
+void DataLoader::free_data() {
+    if (data != nullptr) {
+        free(data);
+        data = nullptr;
+    }
+
+}

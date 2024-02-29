@@ -26,6 +26,9 @@ struct Config {
         all_points.clear();
     }
 
+
+    bool test_dir_vector = 0;
+
     Config() = default;
 
 };

@@ -136,6 +136,8 @@ else()
     endif()
 endif()
 
+message(${CMAKE_CXX_FLAGS})
+
 # if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 #   SET( CMAKE_CXX_FLAGS  "${DEBUG_FLAG} -Ofast -std=c++11 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
 #   check_cxx_compiler_flag("-march=native" COMPILER_SUPPORT_NATIVE_FLAG)

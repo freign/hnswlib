@@ -16,7 +16,12 @@ public:
         }
         return reinterpret_cast<const void*>(data + id * dim * data_type_len);
     }
-
+    void print_point_data_int8(int id) {
+        const uint8_t *point = reinterpret_cast<const uint8_t*>(point_data(id));
+        for (int i = 0; i < dim; i++)
+            std::cout << (uint32_t)*(point + i) << ' '; 
+            std::cout << '\n';
+    }
     uint32_t get_elements();
     uint32_t get_dim();
     void free_data();

@@ -7,6 +7,7 @@
 #include "ArgParser.h"
 #include "config.h"
 #include "statis_tasks.h"
+#include "dir_vector.h"
 
 using namespace std;
 using DATALOADER::DataLoader;
@@ -15,11 +16,10 @@ using DATALOADER::DataLoader;
 
 template<typename dist_t>
 void begin_tst(Tester<dist_t> *rt, Config *config) {
-    
     // rt->test();
     // rt->test_waste_cands();
-    rt->test_used_neighbor_dist();
-
+    // rt->test_used_neighbor_dist();
+    rt->test_dir_vector();
     delete rt;
 }
 

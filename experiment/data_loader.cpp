@@ -1,6 +1,6 @@
 #include "data_loader.h"
 
-using DATALOADER::DataLoader;
+namespace DATALOADER {
 DataLoader::DataLoader(std::string data_type_name, uint32_t _max_elements, std::string _data_path) {
     // float
     data_type_len = 4;
@@ -56,4 +56,5 @@ void DataLoader::free_data() {
         data = nullptr;
     }
 
+}
 }

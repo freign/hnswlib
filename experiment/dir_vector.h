@@ -100,25 +100,6 @@ void Dir_Vector::calc_dir_vector_int8(const void *point, const void *neighbor, i
     const uint8_t *neighbor_data = reinterpret_cast<const uint8_t*>(neighbor);
     uint32_t *now_data = (data + id * vector_len);
 
-
-// {
-
-//     _mm_prefetch((const char *) (point), _MM_HINT_T0);
-//     _mm_prefetch((const char *) (neighbor), _MM_HINT_T0);
-//     _mm_prefetch((const char *) (now_data), _MM_HINT_T0);
-
-//     bool relative[dim];
-//     for (int i = 0; i < dim; i++) {
-//         relative[i] = (*(point_data+i) < *(neighbor_data+i));
-//     }
-//     for (int i = 0; i < 32; i++) {
-//         int blk = 0;
-//         for (int j = i; j < dim; j+= 32) {
-//             now_data[blk++] |= (relative[j] << i);
-//         }
-//     }
-// }
-
     _mm_prefetch((const char *) (point), _MM_HINT_T0);
     _mm_prefetch((const char *) (neighbor), _MM_HINT_T0);
 

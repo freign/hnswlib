@@ -57,6 +57,11 @@ public:
     }
 
     void test() {
+        config->use_dir_vector = 1;
+        if (config->use_dir_vector) {
+            calc_dir_vector();
+            alg_hnsw->dir_vectors_ptr = &dir_vectors;
+        }
         test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
     }
 
@@ -64,6 +69,7 @@ public:
 
     void test_used_neighbor_dist();
 
+    void calc_dir_vector();
     void test_dir_vector();
 
     vector<dir_vector::Dir_Vector*> dir_vectors;
@@ -93,7 +99,6 @@ void Tester<dist_t>::test_waste_cands() {
         config->clear_cand();
         alg_hnsw->setEf(ef);
         float recall = test_approx(query_data_loader, gt_loader, alg_hnsw, 10);
-
         cout << ef << "\t" << config->tot_cand_nodes << "\t" << config->wasted_cand_nodes << "\t" << 1.0 * config->wasted_cand_nodes / config->tot_cand_nodes 
             << config->tot_calculated_nodes << "\t" << 1.0 * config->tot_cand_nodes / config->tot_calculated_nodes << '\n';
     }
@@ -119,7 +124,6 @@ void Tester<dist_t>::test_used_neighbor_dist() {
     for (int i = 0; i < qsize; i+=10) {
         config->clear_used_neighbors();
         auto ans = alg_hnsw->searchKnn(query_data_loader->point_data(i), 10);
-        // cout << "qid = " << i << '\n';
 
         int nearest_neighbor = ans.top().second;
 
@@ -132,14 +136,17 @@ void Tester<dist_t>::test_used_neighbor_dist() {
     }
 }
 
+
+
 template<typename dist_t>
-void Tester<dist_t>::test_dir_vector() {
+void Tester<dist_t>::calc_dir_vector() {
+    if (dir_vectors.size() > 0) {
+        cout << "dir vectors calculated already\n";
+        return ;
+    }
 
     using dir_vector::Dir_Vector;
     Dir_Vector::init(data_loader->get_dim());
-    config->test_dir_vector = 1;
-
-
     dir_vectors.resize(data_loader->get_elements());
 
     for (int i = 0; i < data_loader->get_elements(); i++) {
@@ -162,11 +169,49 @@ void Tester<dist_t>::test_dir_vector() {
             }
         }
     }
+    
+}
+template<typename dist_t>
+void Tester<dist_t>::test_dir_vector() {
+    using dir_vector::Dir_Vector;
+    config->test_dir_vector = 1;
 
-    // auto neighbors = get_hnsw_layer0_neighbors(alg_hnsw, 1);
-    // for (int i = 0; i < neighbors.size(); i++) {
-    //     data_loader->print_point_data_int8(neighbors[i]);
-    //     dir_vectors[1]->print_dir_vector(i);
-    // }
+    calc_dir_vector();
 
+    size_t qsize = query_data_loader->get_elements();
+    
+    hnswlib::SpaceInterface<int> *space = new hnswlib::L2SpaceI(data_loader->get_dim());
+    auto dist_func = space->get_dist_func();
+
+    int dim = data_loader->get_dim();
+    int vector_len = ceil(dim / 32);
+    int v = 2;
+    const uint8_t *v_data = reinterpret_cast<const uint8_t*>(data_loader->point_data(v));
+    for (int i = 0; i < qsize; i+=100) {
+        
+        const uint8_t *q_data = reinterpret_cast<const uint8_t*>(query_data_loader->point_data(i));
+
+        auto neighbors = get_hnsw_layer0_neighbors(alg_hnsw, v);
+        Dir_Vector dvq(1);
+        Dir_Vector *dv = dir_vectors[v];
+
+        dvq.calc_dir_vector_int8(data_loader->point_data(v), query_data_loader->point_data(i), 0);
+
+        vector<float> l1_dis(data_loader->get_dim());
+        for (int j = 0; j < l1_dis.size(); j++) {
+            l1_dis[j] = abs(v_data[j] - q_data[j]);
+        }
+        for (auto l1: l1_dis) cout << l1 << ' '; cout << '\n';
+
+        priority_queue<pair<int, int> > neighbor_dists;
+        for (int j = 0; j < neighbors.size(); j++) {
+            auto n = neighbors[j];
+
+            int dist = dist_func(data_loader->point_data(n), query_data_loader->point_data(i), space->get_dist_func_param());
+            neighbor_dists.push(make_pair(dist, j));
+
+        }
+    }
+
+    delete space;
 }

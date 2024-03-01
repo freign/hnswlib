@@ -2,6 +2,7 @@
 
 #include "visited_list_pool.h"
 #include "../experiment/config.h"
+#include "../experiment/dir_vector.h"
 #include "hnswlib.h"
 #include <atomic>
 #include <random>
@@ -72,6 +73,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::unordered_set<tableint> deleted_elements;  // contains internal ids of deleted elements
 
     Config *config;
+    std::vector<dir_vector::Dir_Vector*> * dir_vectors_ptr;
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }

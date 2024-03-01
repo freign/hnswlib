@@ -71,9 +71,10 @@ public:
 
             __m128i xor_result = _mm_xor_si128(vec1_reg, vec2_reg);
             __m128i mask_result = _mm_and_si128(xor_result, mask_reg);
-            for (int j = 0; j < simd_width; ++j) {
-                ans += _mm_popcnt_u32(static_cast<unsigned int>(_mm_extract_epi32(mask_result, j)));
-            }
+
+            uint64_t* mask_result_ptr = reinterpret_cast<uint64_t*>(&mask_result);
+            ans += _mm_popcnt_u64(mask_result_ptr[0]);
+            ans += _mm_popcnt_u64(mask_result_ptr[1]);
         }
 
         for (; i < vector_len; i++)
@@ -84,13 +85,64 @@ public:
         const uint8_t *point_data1 = reinterpret_cast<const uint8_t*>(data1);
         const uint8_t *point_data2 = reinterpret_cast<const uint8_t*>(data2);
 
-        std::vector<uint32_t> mask(vector_len);
+        std::vector<uint32_t> mask(vector_len, 0);
 
-        int threshold = 32;
-        for (int j = 0; j < dim; j++) {
-            if (std::abs(point_data1[j] - point_data2[j]) > threshold)
-                mask[j/32] |= (1<<j%32);
+
+        // {
+        //     int threshold = 32;
+        //     for (int j = 0; j < dim; j++) {
+        //         if (std::abs(point_data1[j] - point_data2[j]) > threshold)
+        //             mask[j/32] |= (1<<j%32);
+        //     }
+        // }
+
+        __m256i threshold_vec = _mm256_set1_epi8(32); // 正阈值向量，已调整偏移
+        // __m256i threshold_vec_neg = _mm256_set1_epi8(-32 + 0x80); // 负阈值向量，已调整偏移
+        // __m256i offset = _mm256_set1_epi8(0x80); // 映射偏移
+
+        int blk = 0;
+        for (int j = 0; j < dim; j += 32) {
+            __m256i vec1 = _mm256_loadu_si256((__m256i*)(point_data1 + j));
+            __m256i vec2 = _mm256_loadu_si256((__m256i*)(point_data2 + j));
+
+            // 计算差值并应用偏移，将结果映射到有符号整数范围
+            __m256i max_vec = _mm256_max_epu8(vec1, vec2);
+            __m256i min_vec = _mm256_min_epu8(vec1, vec2);
+            __m256i diff = _mm256_subs_epu8(max_vec, min_vec);
+
+            // uint8_t *diffs = reinterpret_cast<uint8_t*>(&diff);
+            // uint8_t *maxs = reinterpret_cast<uint8_t*>(&max_vec);
+            // uint8_t *mins = reinterpret_cast<uint8_t*>(&min_vec);
+            // diff = _mm256_add_epi8(diff, offset); // 应用偏移
+            
+            // 比较差值是否超出阈值范围
+            __m256i cmp_result_pos = _mm256_cmpgt_epi8(diff, threshold_vec);
+
+            // 将比较结果转换为掩码
+            uint32_t cmp_mask = static_cast<uint32_t>(_mm256_movemask_epi8(cmp_result_pos));
+
+            uint32_t diff_neg_mask = static_cast<uint32_t>(_mm256_movemask_epi8(diff));
+
+            cmp_mask |= diff_neg_mask;
+
+            // 更新掩码向量
+            // if (mask[j / 32] != cmp_mask) {
+            //     std::cout << "error\n";
+
+            //     for (int k = 0; k < 32; k ++) {
+            //         std::cout << (uint32_t)*(maxs+k) << ' ' << (uint32_t)*(mins+k) << ' ' << (uint32_t)*(diffs+k) << '\n';
+            //     }
+            //     std::cout << "---------\n";
+            //     for (int k = 0; k < 32; k ++) {
+            //         std::cout << (uint32_t)*(point_data1 + k) << ' ' << (uint32_t)*(point_data2 + k) 
+            //             << ' ' << (uint32_t)*(diffs+k) << ' ' << (mask[j / 32]>>k&1) << ' ' << (cmp_mask>>k&1) << '\n';
+            //     }
+            //     exit(-1);
+            // }
+            mask[blk++] |= cmp_mask;
         }
+
+
         return mask;
     }
     

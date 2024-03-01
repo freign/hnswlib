@@ -10,11 +10,14 @@ class Dir_Vector {
 public:
     static int dim;
     static int vector_len; // vector_len = ceil(dim/32)
+    int len;
+
     static void init(int _dim) {
         dim = _dim;
         vector_len = (dim + 31) / 32;
     }
     Dir_Vector(size_t size) {
+        len = size;
         data = new uint32_t [size * vector_len];
         memset(data, 0, size * vector_len * sizeof(uint32_t));
     }
@@ -54,6 +57,10 @@ public:
         return ans;
     }
     uint32_t calc_dis_with_mask(uint32_t *vec1, uint32_t *vec2, uint32_t *mask) {
+        if ((dim & 127)) {
+            std::cerr << "dim can't divide 128";
+            exit(0);
+        }
         int ans = 0;
         const int simd_width = 4;
         int i = 0;
@@ -89,7 +96,6 @@ public:
     
 private:
     uint32_t *data;
-    int len;
 };
 
 int Dir_Vector::dim = 0;

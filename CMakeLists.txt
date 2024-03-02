@@ -114,7 +114,7 @@ option(ENABLE_DEBUG "Enable debug symbols" OFF)
 set(CMAKE_CXX_STANDARD 17)
 
 if (ENABLE_DEBUG)
-    SET( CMAKE_CXX_FLAGS  "-g -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
+    SET( CMAKE_CXX_FLAGS  "-g -mavx2 -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
 else()
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         SET( CMAKE_CXX_FLAGS  "-Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )

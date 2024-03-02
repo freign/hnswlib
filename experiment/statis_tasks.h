@@ -57,7 +57,7 @@ public:
     }
 
     void test() {
-        config->use_dir_vector = 1;
+        config->use_dir_vector = 0;
         if (config->use_dir_vector) {
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;

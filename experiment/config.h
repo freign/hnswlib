@@ -10,11 +10,11 @@ struct Config {
     uint64_t wasted_cand_nodes;
     uint64_t tot_calculated_nodes;
     void clear_cand() {
-        tot_cand_nodes = 0;
-        wasted_cand_nodes = 0;
-        tot_calculated_nodes = 0;
+        tot_cand_nodes = 0; // 加入candidates集合的点数
+        wasted_cand_nodes = 0; // 最后留在candidates集合中的点数，
+                               // 这些点加入了candidates集合但是没有任何作用
+        tot_calculated_nodes = 0; // 计算了距离的点数
     }
-
 
     bool statis_used_neighbor_dist = 0;
     std::unordered_set<uint64_t> used_points_id;
@@ -26,9 +26,9 @@ struct Config {
         all_points.clear();
     }
 
-
+    
     bool test_dir_vector = 0;
-
+    bool use_dir_vector = 0;
     Config() = default;
 
 };

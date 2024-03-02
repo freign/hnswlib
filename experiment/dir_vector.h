@@ -73,6 +73,7 @@ public:
             __m128i mask_result = _mm_and_si128(xor_result, mask_reg);
 
             uint64_t* mask_result_ptr = reinterpret_cast<uint64_t*>(&mask_result);
+
             ans += _mm_popcnt_u64(mask_result_ptr[0]);
             ans += _mm_popcnt_u64(mask_result_ptr[1]);
         }
@@ -96,7 +97,7 @@ public:
         //     }
         // }
 
-        __m256i threshold_vec = _mm256_set1_epi8(32); // 正阈值向量，已调整偏移
+        __m256i threshold_vec = _mm256_set1_epi8(8); // 正阈值向量，已调整偏移
         // __m256i threshold_vec_neg = _mm256_set1_epi8(-32 + 0x80); // 负阈值向量，已调整偏移
         // __m256i offset = _mm256_set1_epi8(0x80); // 映射偏移
 

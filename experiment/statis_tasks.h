@@ -72,6 +72,7 @@ public:
     void calc_dir_vector();
     void test_dir_vector();
 
+    void test_distribution();
     vector<dir_vector::Dir_Vector*> dir_vectors;
 
 private:
@@ -214,4 +215,14 @@ void Tester<dist_t>::test_dir_vector() {
     }
 
     delete space;
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_distribution() {
+    for (int d = 0; d < data_loader->get_dim(); d += 16) {
+        for (int i = 0; i < data_loader->get_elements(); i++) {
+            const uint8_t* dims = reinterpret_cast<const uint8_t*>(data_loader->point_data(i));
+            cout << (uint32_t)dims[d] << '\n';
+        }
+    }
 }

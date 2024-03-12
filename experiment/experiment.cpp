@@ -16,10 +16,11 @@ using DATALOADER::DataLoader;
 
 template<typename dist_t>
 void begin_tst(Tester<dist_t> *rt, Config *config) {
-    rt->test();
+    // rt->test();
     // rt->test_waste_cands();
     // rt->test_used_neighbor_dist();
     // rt->test_dir_vector();
+    rt->test_distribution();
     delete rt;
 }
 

@@ -342,6 +342,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 stop_condition->add_point_to_result(getExternalLabel(ep_id), ep_data, dist);
             }
             candidate_set.emplace(-dist, ep_id);
+
+
+            // config 
+            config->search_knn_times ++ ;
+            // config ep dist
+            if (config->test_enter_point_dis) {
+                config->ep_dis_tot += dist;
+            }
+
         } else {
             lowerBound = std::numeric_limits<dist_t>::max();
             candidate_set.emplace(-lowerBound, ep_id);
@@ -349,6 +358,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_array[ep_id] = visited_array_tag;
 
+
+        // dir vector prediction
         StopW timer;
         int dim = dir_vector::Dir_Vector::dim;
         dir_vector::Dir_Vector dvq(1);
@@ -357,11 +368,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         float avg_pred_dist;
         int tot_pred_nodes;
         static std::vector<std::pair<int, int> > pred_dists(maxM0_ * 2);
-        // std::vector<int> radix_buckets(dim + 1);
-        // std::vector<int> neighbor_in_order(maxM0_ * 2);
-
-        // _mm_prefetch((char *) (neighbor_in_order.data()), _MM_HINT_T0);
-        // _mm_prefetch((char *) (radix_buckets.data()), _MM_HINT_T0);
 
         if (config->statis_wasted_cand) {
             config->tot_cand_nodes += candidate_set.size();

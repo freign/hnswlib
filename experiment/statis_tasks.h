@@ -9,6 +9,7 @@
 #include "ArgParser.h"
 #include "config.h"
 #include "dir_vector.h"
+#include "k_means.cpp"
 
 using namespace std;
 
@@ -38,11 +39,8 @@ public:
 
         alg_hnsw = new hnswlib::HierarchicalNSW<dist_t>(space, max_elements, M, ef_construction);
         alg_hnsw->config = config;
-        for (int i = 0; i < data_loader->get_elements(); i++) {
-            alg_hnsw->addPoint(data_loader->point_data(i), i);
-        }
-
-        cout << "build graph finished\n";
+        
+        // build_graph();
 
         // data_loader->free_data();
     }
@@ -57,12 +55,22 @@ public:
     }
 
     void test() {
-        config->use_dir_vector = 0;
+        build_graph();
+        config->use_dir_vector = 1;
         if (config->use_dir_vector) {
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;
         }
         test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
+        cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
+    }
+
+    void build_graph() {
+        for (int i = 0; i < data_loader->get_elements(); i++) {
+            alg_hnsw->addPoint(data_loader->point_data(i), i);
+        }
+
+        cout << "build graph finished\n";
     }
 
     void test_waste_cands();
@@ -75,6 +83,7 @@ public:
     void test_distribution();
     vector<dir_vector::Dir_Vector*> dir_vectors;
 
+    void test_k_means();
 private:
     string data_dir;
     string data_path;
@@ -166,12 +175,14 @@ void Tester<dist_t>::calc_dir_vector() {
             for (auto n: neighbors) {
                 dir_vectors[i]->calc_dir_vector_float(data_loader->point_data(i),
                     data_loader->point_data(n), tot);
+                
                 tot++;
             }
         }
     }
     
 }
+
 template<typename dist_t>
 void Tester<dist_t>::test_dir_vector() {
     using dir_vector::Dir_Vector;
@@ -225,4 +236,95 @@ void Tester<dist_t>::test_distribution() {
             cout << (uint32_t)dims[d] << '\n';
         }
     }
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_k_means() {
+    int max_level = 0;
+    vector<int> levels;
+    for (int i = 0; i < data_loader->get_elements(); i++) {
+        int level = alg_hnsw->getRandomLevel(alg_hnsw->mult_);
+        levels.push_back(level);
+        max_level = max(max_level, level);
+    }
+    vector<int> num_layer(max_level+1);
+    for (auto l: levels) {
+        for (int j = 0; j <= l; j++)
+            num_layer[j]++;
+    }
+    
+    for (auto num: num_layer)
+        cout << num << '\n';
+    vector<int>().swap(levels);
+
+    vector<int> ids_for_cluster;
+    int N = data_loader->get_elements();
+
+    ids_for_cluster.resize(N);
+    for (int i = 0; i < N; i++)
+        ids_for_cluster[i] = i;
+
+    vector<vector<int> > high_layer_points(1);
+
+    if (is_same<float, dist_t>::value) {
+        for (int l = 1; l <= max_level; l++) {
+            cout << "l = " << l << ' ' << ids_for_cluster.size() << ' ' << num_layer[l] << endl;
+
+            if (num_layer[l] >= 1000) {
+                random_shuffle(ids_for_cluster.begin(), ids_for_cluster.end());
+                ids_for_cluster.resize(num_layer[l]);
+                high_layer_points.push_back(ids_for_cluster);
+
+            } else {
+
+                KMeans<dist_t, float> *k_means = new KMeans<dist_t, float>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
+                    space, data_loader, ids_for_cluster);
+
+                k_means->run(5);
+
+                // for (int i = 0; i < 3; i++) {
+                //     KMeans<dist_t, float> *new_k_means = new KMeans<dist_t, float>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
+                //         space, data_loader, ids_for_cluster);
+                    
+                //     new_k_means->run(5);
+                //     if (new_k_means->tot_dist() < k_means->tot_dist())
+                //         swap(new_k_means, k_means);
+
+                //     delete new_k_means;
+                // }
+
+                auto centers = k_means->get_centers_global();
+                high_layer_points.push_back(centers);
+                
+                ids_for_cluster = centers;
+                delete k_means;
+            }
+            
+        }
+    } else if (is_same<int, dist_t>::value) {
+        for (int l = 1; l <= max_level; l++) {
+            KMeans<dist_t, int64_t> *k_means = new KMeans<dist_t, int64_t>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
+                space, data_loader, ids_for_cluster);
+        }
+    }
+
+    {
+        cout << "build graph begin\n";
+        unordered_set<int> added;
+        for (int l = max_level; l > 0; l--) {
+            for (auto p: high_layer_points[l]) {
+                if (added.find(p) != added.end()) continue;
+                added.insert(p);
+                alg_hnsw->addPoint(data_loader->point_data(p), p, l);
+            }
+        }
+        for (int i = 0; i < N; i++)
+            if (added.find(i) == added.end()) {
+                alg_hnsw->addPoint(data_loader->point_data(i), i, 0);
+            }
+
+        vector<vector<int> >().swap(high_layer_points);
+        cout << "build graph finished\n";
+    }
+    test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
 }

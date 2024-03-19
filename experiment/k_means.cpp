@@ -36,7 +36,6 @@ public:
             cluster_nums[j] = 0;
             sum_dis[j] = 0;
         }
-
         for (int i = 0; i < N; ++i) {
             dist_t min_dist = std::numeric_limits<dist_t>::max();
             int closest_center = -1;
@@ -125,9 +124,10 @@ public:
         for (int iter = 0; iter < maxIterations; ++iter) {
             assignPointsToClosestCenter();
 
-            cout << "iter: " << iter << '\n';
-            output();
-            cout << "tot cost " << tot_dist() << ' ' << tot_dist_recalc() << '\n';
+            // output();
+            // cout << "iter: " << iter << '\n';
+            // cout << "tot cost " << tot_dist() << ' ' << tot_dist_recalc() << '\n';
+
             auto lst_centers = centers;
             updateCenters();
             bool changed = 0;
@@ -141,7 +141,8 @@ public:
     dist_t dis(int i, int j) {
         i = globalIDS[i];
         j = globalIDS[j];
-        return space->get_dist_func()(data_loader->point_data(globalIDS[i]), data_loader->point_data(j), space->get_dist_func_param());
+        
+        return space->get_dist_func()(data_loader->point_data(i), data_loader->point_data(j), space->get_dist_func_param());
     }
 
     sum_type_t tot_dist() {
@@ -161,6 +162,12 @@ public:
         for (int i = 0; i < k ; i++)
             cout << centers[i] << " nums = " << cluster_nums[i] << " sum dist = " << sum_dis[i] << '\n';
 
+    }
+    vector<int> get_centers_global() {
+        vector<int> centers_global;
+        for (int i = 0; i < k; i++)
+            centers_global.push_back(globalIDS[centers[i]]);
+        return centers_global;
     }
 private:
     int k; // 聚类数量

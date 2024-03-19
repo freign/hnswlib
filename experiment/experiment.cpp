@@ -16,11 +16,15 @@ using DATALOADER::DataLoader;
 
 template<typename dist_t>
 void begin_tst(Tester<dist_t> *rt, Config *config) {
-    // rt->test();
+    config->test_enter_point_dis = 1;
+    rt->test();
     // rt->test_waste_cands();
     // rt->test_used_neighbor_dist();
     // rt->test_dir_vector();
-    rt->test_distribution();
+    // rt->test_distribution();
+    // rt->test_k_means();
+
+    cout << "avg ep dist = " << config->ep_dis_tot / config->search_knn_times << '\n';
     delete rt;
 }
 

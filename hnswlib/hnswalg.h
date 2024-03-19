@@ -419,9 +419,16 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                 using namespace std;
                 
-                dvq.calc_dir_vector_int8(getDataByInternalId(current_node_id), data_point, 0);
-                mask = dvq.get_mask_int8(data_point, getDataByInternalId(current_node_id));
-                dv = (*dir_vectors_ptr)[current_node_id];
+                if (is_same<dist_t, float>::value) {
+                    dvq.calc_dir_vector_int8(getDataByInternalId(current_node_id), data_point, 0);
+                    mask = dvq.get_mask_int8(data_point, getDataByInternalId(current_node_id));
+                    dv = (*dir_vectors_ptr)[current_node_id];
+                } else {
+                    dvq.calc_dir_vector_float(getDataByInternalId(current_node_id), data_point, 0);
+                    mask = dvq.get_mask_float(data_point, getDataByInternalId(current_node_id));
+                    dv = (*dir_vectors_ptr)[current_node_id];
+                    
+                }
             }
 
             
@@ -443,10 +450,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                 for (size_t j = 1; j <= size; j++) {
                     int candidate_id = *(data + j);
-
-                    // dist_t a = fstdistfunc_(data_point, getDataByInternalId((*(data + j))), dist_func_param_);
-                    // pred_dists[j] = std::make_pair(a, j);;
-
                     int pred_dist;
                     if (!(visited_array[candidate_id] == visited_array_tag)) {
                         pred_dist = dvq.calc_dis_with_mask(dir_data0, dir_data_neighbors, mask_data);
@@ -457,42 +460,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     pred_dists[j] = std::make_pair(pred_dist, j);
                 }
                 avg_pred_dist /= tot_pred_nodes;
-
-{
-                // // DEBUG
-                // static int couter = 0;
-                // couter++;
-                // if (couter == 10) exit(0);
-                // using namespace std;
-
-                // std::cout << "query data; current point\n";
-                // const uint8_t *query_data = reinterpret_cast<const uint8_t*>(data_point);
-                // const uint8_t *current_point_data = reinterpret_cast<const uint8_t*>(getDataByInternalId(current_node_id));
-                // const uint8_t *near_point_data = reinterpret_cast<const uint8_t*>(getDataByInternalId(6418));
-
-                // for (int i = 0; i < 32; i++) {
-                //     std::cout << (uint32_t)*(query_data+i) << ' ' << (uint32_t)*(current_point_data+i) << ' ' << (uint32_t)*(near_point_data+i) << '\n';
-                // }
-                // std::cout << *mask_data << '\n';
-                // std::cout << "query dir vector\n";
-                // dvq.print_dir_vector(0);
-                // sort(pred_dists.begin()+1, pred_dists.begin() + size + 1);
-
-                // for (size_t j = 1; j <= size; j++) {
-                //     int candidate_id = *(data + pred_dists[j].second);
-                //     dist_t real_dist = fstdistfunc_(data_point, getDataByInternalId(candidate_id), dist_func_param_);
-                //     std::cout << "pos = " << pred_dists[j].second << " node = " << candidate_id << " pred dist = " << pred_dists[j].first 
-                //         << " real dist = " << real_dist << '\n';
-                //     dv->print_dir_vector(pred_dists[j].second-1);
-                    
-                // }
-                // std::cout << "avg = " << avg_pred_dist << '\n';
-                // std::cout << "-----------\n";
-}
-
             } else {
             }
-
+            // std::cout << "---------------------\n";
 
 #ifdef USE_SSE
             _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
@@ -538,14 +508,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 if (!(visited_array[candidate_id] == visited_array_tag)) {
                     visited_array[candidate_id] = visited_array_tag;
 
-                    // if (pred_dists[j].first > avg_pred_dist * 1.5) {
-                    //     wrong_throw ++ ;
-                    //     continue;
-                    // }
 
                     if (config->use_dir_vector) {
-                        if (pred_dists[j].first > avg_pred_dist * 1.2) {
+                        if (pred_dists[j].first > avg_pred_dist * 1.1) {
                             calc_avoid ++ ;
+                            config->disc_calc_avoided ++;
                             continue;
                         }
                     }
@@ -554,6 +521,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
 
+                    config->tot_dist_calc ++ ;
                     tot_calc++;
 
                     if (config->statis_wasted_cand) {

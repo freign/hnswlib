@@ -5,6 +5,8 @@
 
 struct Config {
 
+    int search_knn_times = 0;
+
     bool statis_wasted_cand = 0;
     uint64_t tot_cand_nodes;
     uint64_t wasted_cand_nodes;
@@ -31,5 +33,10 @@ struct Config {
     bool use_dir_vector = 0;
     Config() = default;
 
+    bool test_enter_point_dis = 0;
+    float ep_dis_tot = 0;
+    
+    uint64_t tot_dist_calc = 0;
+    uint64_t disc_calc_avoided = 0;
 };
 

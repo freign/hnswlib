@@ -9,7 +9,7 @@
 #include "ArgParser.h"
 #include "config.h"
 #include "dir_vector.h"
-#include "k_means.cpp"
+#include "k_means.h"
 
 using namespace std;
 
@@ -56,7 +56,7 @@ public:
 
     void test() {
         build_graph();
-        config->use_dir_vector = 1;
+        config->use_dir_vector = 0;
         if (config->use_dir_vector) {
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;

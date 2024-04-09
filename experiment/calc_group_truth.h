@@ -62,6 +62,8 @@ void calc_gt(std::string data_dir,
 
 class GT_Loader {
 public:
+
+    // 加载groud truth文件，但是不会生成该文件
     GT_Loader(std::string data_dir, 
     DataLoader *data_loader, 
     DataLoader *query_data_loader) {
@@ -69,7 +71,7 @@ public:
         gt_path = data_dir + "/gnd_" + std::to_string(data_loader->get_elements()) + ".gt";
         file = std::ifstream(gt_path, std::ios::binary);
         if (!file) {
-            std::cerr << "file " << gt_path << " not exist!\n";
+            std::cerr << "file " << gt_path << " not exist! calc ground truth first!\n";
             return ;
         }
 

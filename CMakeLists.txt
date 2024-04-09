@@ -171,7 +171,26 @@ message(${CMAKE_CXX_FLAGS})
 # endif()
 # SET( CMAKE_CXX_FLAGS  "-g -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
 
+set(EXPERIMENT_SOURCES
+    experiment/data_loader.cpp
+    experiment/ArgParser.cpp
+    experiment/dir_vector.cpp
+    # experiment/k_means.cpp
+)
+
 include_directories(${CMAKE_SOURCE_DIR}/hnswlib)
-add_executable(experiment experiment/experiment.cpp 
-  experiment/data_loader.cpp)
+# include_directories(${CMAKE_SOURCE_DIR}/kmeans)
+include_directories(${CMAKE_SOURCE_DIR}/experiment)
+
+add_executable(experiment 
+    experiment/experiment.cpp
+    ${EXPERIMENT_SOURCES}
+)
 target_link_libraries(experiment hnswlib)
+    
+add_executable(val_kmeans 
+    # experiment/k_means.cpp
+    tests/val_kmeans.cpp
+    ${EXPERIMENT_SOURCES}
+)
+target_link_libraries(val_kmeans hnswlib)

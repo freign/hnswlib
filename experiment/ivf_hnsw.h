@@ -21,4 +21,7 @@ public:
     vector<uint32_t> ivfflat_search(const void* data_point, int knn, int nprobe) {
         return KMeans<dist_t, sum_type_t>::searchKnn(data_point, knn, nprobe);
     }
+    vector<uint32_t> ivfflat_search_prune(const void* data_point, int knn, int nprobe, float epsilon) {
+        return KMeans<dist_t, sum_type_t>::searchKnn_prune(data_point, knn, nprobe, epsilon);
+    }
 };

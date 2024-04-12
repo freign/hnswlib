@@ -13,12 +13,14 @@ KMeans<dist_t, sum_type_t>::KMeans(int _k, int _N, int _dim, hnswlib::SpaceInter
     centroids.resize(k);
     for (int i = 0; i < k; i++)
         centroids[i].resize(dim);
-    sum_dis.resize(k, 0);
     assignments.resize(N, -1); // 初始化点分配为-1
     cluster_nums.resize(k, 0);
     diameters.resize(k, 0);
     globalIDS = ids;
     clusters.resize(k);
+
+    center_dis.resize(k, vector<float>(k));
+    dis2centroid.resize(N, 1e9);
 }
 
 std::random_device rd; // 用于获取随机数种子
@@ -85,13 +87,13 @@ template<typename dist_t, typename sum_type_t>
 void KMeans<dist_t, sum_type_t>::assignPointsToClosestCenter() {
     for (int j = 0; j < k; j++) {
         cluster_nums[j] = 0;
-        sum_dis[j] = 0;
     }
     for (int i = 0; i < N; ++i) {
-        dist_t min_dist = std::numeric_limits<dist_t>::max();
-        int closest_center = -1;
+        float min_dist = 1e9;
+        int closest_center = assignments[i];
+        if (closest_center != -1) min_dist = dis(i, centroids[closest_center].data());
         for (int j = 0; j < k; ++j) {
-            // dist_t dist = dis(i, centers[j]);
+            if (closest_center != -1 && min_dist * 2 < center_dis[closest_center][j]) continue;
             dist_t dist = dis(i, centroids[j].data());
             if (dist < min_dist) {
                 min_dist = dist;
@@ -99,7 +101,7 @@ void KMeans<dist_t, sum_type_t>::assignPointsToClosestCenter() {
             }
         }
         assignments[i] = closest_center;
-        sum_dis[closest_center] += min_dist;
+        dis2centroid[i] = min_dist;
         cluster_nums[closest_center] ++ ;
     }
 }
@@ -187,15 +189,28 @@ void KMeans<dist_t, sum_type_t>::updateCenters() {
 }
 
 template<typename dist_t, typename sum_type_t>
+void KMeans<dist_t, sum_type_t>::updateCenterDis() {
+    for (int i = 0; i < k; i ++)
+        for (int j = i + 1; j < k; j++)
+            center_dis[i][j] = center_dis[j][i] = dis(centroids[i].data(), centroids[j].data());
+    for (int i = 0; i < k; i++)
+        center_dis[i][i] = 0;  
+}
+
+template<typename dist_t, typename sum_type_t>
 void KMeans<dist_t, sum_type_t>::run(int maxIterations) {
 
     initializeCenters();
+    updateCenterDis();
+
     for (int iter = 0; iter < maxIterations; ++iter) {
         // cout << "iter = " << iter << '\n';
         assignPointsToClosestCenter();
 
         auto lst_centers = centroids;
+
         updateCenters();
+        updateCenterDis();
 
         bool changed = 0;
         for (int j = 0; j < k; j++)
@@ -239,8 +254,6 @@ template<typename dist_t, typename sum_type_t>
 sum_type_t KMeans<dist_t, sum_type_t>::tot_dist() {
     // tot_dist 实现...
     sum_type_t sum = 0;
-    for (int j = 0; j < k; j++)
-        sum += sum_dis[j];
     return sum;
 }
 
@@ -271,7 +284,7 @@ void KMeans<dist_t, sum_type_t>::output() {
     cout << "centers:\n";
     for (int i = 0; i < k; i++) {
         assert(clusters[i].size() == cluster_nums[i]);
-        cout << i << " nums = " << cluster_nums[i] << " sum dist = " << sum_dis[i] << " diameter = " << diameters[i] << '\n';
+        cout << i << " nums = " << cluster_nums[i] << " diameter = " << diameters[i] << '\n';
     }
 }
 
@@ -283,7 +296,7 @@ vector<vector<dist_t> > KMeans<dist_t, sum_type_t>::get_centers_global() {
 int searchCalc = 0;
 
 template<typename dist_t, typename sum_type_t>
-priority_queue<pair<float, int> > KMeans<dist_t, sum_type_t>::find_nearest_centers(const void* data_point, int nprobe) {
+priority_queue<pair<float, int> > KMeans<dist_t, sum_type_t>::find_nearest_centers_id(const void* data_point, int nprobe) {
     priority_queue<pair<float, int> > near_centers;
     for (int i = 0; i < k; i++) {
         float d = dis(centroids[i].data(), data_point);
@@ -293,12 +306,23 @@ priority_queue<pair<float, int> > KMeans<dist_t, sum_type_t>::find_nearest_cente
     return near_centers;
 }
 
+template<typename dist_t, typename sum_type_t>
+vector<vector<dist_t> > KMeans<dist_t, sum_type_t>::find_nearest_centers(const void* data_point, int nprobe) {
+    auto nn_ids = find_nearest_centers_id(data_point, nprobe);
+    vector<vector<dist_t> > ans;
+    while (nn_ids.size()) {
+        ans.push_back(centroids[nn_ids.top().second]);
+        nn_ids.pop();
+    }
+    reverse(ans.begin(), ans.end());
+    return ans;
+}
 // ivf-flat
 template<typename dist_t, typename sum_type_t>
 vector<uint32_t> KMeans<dist_t, sum_type_t>::searchKnn(const void* data_point, int knn, int nprobe) {
 
     // centers id: [0, k-1]
-    auto near_centers = find_nearest_centers(data_point, nprobe);
+    auto near_centers = find_nearest_centers_id(data_point, nprobe);
 
     priority_queue<pair<float, int> > nns;
     while(near_centers.size()) {
@@ -322,12 +346,16 @@ vector<uint32_t> KMeans<dist_t, sum_type_t>::searchKnn(const void* data_point, i
     reverse(result.begin(), result.end());
     return result;
 }
+template<typename dist_t, typename sum_type_t>
+dist_t * KMeans<dist_t, sum_type_t>::get_assign(int id) {
+    return centroids[assignments[id]].data();
+}
 
 int prune_search_calc = 0;
 int prune_search_probes = 0;
 template<typename dist_t, typename sum_type_t>
 vector<uint32_t> KMeans<dist_t, sum_type_t>::searchKnn_prune(const void* data_point, int knn, int nprobe, float epsilon) {
-    auto near_centers = find_nearest_centers(data_point, nprobe);
+    auto near_centers = find_nearest_centers_id(data_point, nprobe);
     vector<pair<float, int> > centers;
     while(near_centers.size()) {
         centers.push_back(near_centers.top());

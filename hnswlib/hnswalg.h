@@ -510,6 +510,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
 
                     if (config->use_dir_vector) {
+                        std::cout << "error\n";
+                        exit(0);
                         if (pred_dists[j].first > avg_pred_dist * 1.5) {
                             calc_avoid ++ ;
                             config->disc_calc_avoided ++;
@@ -1347,7 +1349,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         int curlevel = getRandomLevel(mult_);
         if (level >= 0)
             curlevel = level;
-            
+
+        config->max_level = std::max(config->max_level, curlevel);
+
         element_levels_[cur_c] = curlevel;
 
         std::unique_lock <std::mutex> templock(global);

@@ -20,6 +20,7 @@ public:
     void initializeCenters();
     void assignPointsToClosestCenter();
     void updateCenters();
+    void updateCenterDis();
     void run(int maxIterations = 100);
     sum_type_t dis(int i, int j);
     sum_type_t dis(int i, const void* data_point);
@@ -31,19 +32,21 @@ public:
     void calc_diameter();
     vector<uint32_t> searchKnn(const void* data_point, int knn, int nprobe);
     vector<uint32_t> searchKnn_prune(const void* data_point, int knn, int nprobe, float epsilon);
-    priority_queue<pair<float, int> > find_nearest_centers(const void* data_point, int nprobe);
-    
-private:
+    priority_queue<pair<float, int> > find_nearest_centers_id(const void* data_point, int nprobe);
+    vector<vector<dist_t> > find_nearest_centers(const void* data_point, int nprobe);
+    dist_t *get_assign(int id);
+protected:
     int k, N, dim;
     hnswlib::SpaceInterface<dist_t> *space;
     DataLoader *data_loader;
     vector<int> cluster_nums, globalIDS;
+    vector<vector<float> > center_dis;
+    vector<float> dis2centroid;
     // vector<int> centers;
     vector<vector<dist_t> > centroids;
     // assignments: [0, k)
     vector<int> assignments;
     vector<vector<int> > clusters;
-    vector<sum_type_t> sum_dis;
     vector<float> diameters;
 };
 

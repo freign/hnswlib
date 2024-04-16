@@ -58,10 +58,13 @@ public:
         build_graph();
         config->use_dir_vector = 0;
         if (config->use_dir_vector) {
+            cout << "use dir vector\n";
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;
         }
+
         test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
+        cout << "max level = " << config->max_level << "\n";
         cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
     }
 

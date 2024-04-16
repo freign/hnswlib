@@ -1576,5 +1576,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         }
         std::cout << "integrity ok, checked " << connections_checked << " connections\n";
     }
+
+    void degree_adjust();
 };
 }  // namespace hnswlib
+
+#include "degree_adj_impl.tpp"

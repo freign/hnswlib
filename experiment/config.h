@@ -38,5 +38,10 @@ struct Config {
     
     uint64_t tot_dist_calc = 0;
     uint64_t disc_calc_avoided = 0;
+
+    int max_level = 0;
+
+    bool use_degree_adjust = 0;
+    
 };
 

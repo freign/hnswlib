@@ -74,6 +74,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
     Config *config;
     std::vector<dir_vector::Dir_Vector*> * dir_vectors_ptr;
+    std::vector<std::vector<labeltype> > reverse_edges;
+    
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
@@ -473,29 +475,12 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
             
 
-            // std::vector<std::pair<dist_t, int> > real_dist_vector;
-            // real_dist_vector.clear();
-            // for (size_t j = 1; j <= size; j++) {
-            //     int candidate_id = *(data + j);
-            //     char *currObj1 = (getDataByInternalId(candidate_id));
-            //     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
-            //     real_dist_vector.push_back(std::make_pair(dist, j));
-            // }
-            // sort(real_dist_vector.begin(), real_dist_vector.end());
-
             int neighbor_couter = 0;
 
-            // std::cout << "avg: " << avg_pred_dist << "\n--------------------\n";
-            // for (auto pr: real_dist_vector) {
-            //     neighbor_couter ++ ;
-            //     if (neighbor_couter > size / 4) break;
-            //     size_t j = pr.second;
-                
 
             for (size_t j = 1; j <= size; j++) {
 
                 int candidate_id = *(data + j);
-//                    if (candidate_id == 0) continue;
 
 
 #ifdef USE_SSE
@@ -510,8 +495,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
 
                     if (config->use_dir_vector) {
-                        std::cout << "error\n";
-                        exit(0);
                         if (pred_dists[j].first > avg_pred_dist * 1.5) {
                             calc_avoid ++ ;
                             config->disc_calc_avoided ++;
@@ -1577,7 +1560,33 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::cout << "integrity ok, checked " << connections_checked << " connections\n";
     }
 
-    void degree_adjust();
+    void degree_adjust(int eo, int ei);
+    void reconstructGraphWithConstraint(int eo, int ei);
+    void statis_indegree() {
+        std::vector<int> indegree(max_elements_, 0);
+        
+        for (int cur = 0; cur < max_elements_; cur++) {
+            int *data = (int*)get_linklist0(cur);
+            for (int i = 1; i <= *data; i++)
+                indegree[*(data + i)] ++ ;
+        }
+
+        for (int cur = 0; cur < max_elements_; cur++) {
+            std::cout << indegree[cur] << "\n";
+        }
+        
+    }
+    void get_reverse_edges() {
+        reverse_edges.resize(max_elements_, std::vector<labeltype>(0));
+        for (int cur = 0; cur < max_elements_; cur++) {
+            int *data = (int *) get_linklist0(cur);
+            for (int j = 1; j <= *data; j++) {
+                int nn = data[j];
+                reverse_edges[nn].push_back(cur);
+            }
+                
+        }
+    }
 };
 }  // namespace hnswlib
 

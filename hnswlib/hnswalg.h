@@ -74,7 +74,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
     Config *config;
     std::vector<dir_vector::Dir_Vector*> * dir_vectors_ptr;
-    std::vector<std::vector<labeltype> > reverse_edges;
+    std::vector<std::vector<tableint> > reverse_edges;
     
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
@@ -466,6 +466,12 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
             // std::cout << "---------------------\n";
 
+            if (config->use_reverse_edges) {
+                data = reinterpret_cast<int*>((void*)reverse_edges[current_node_id].data()) - 1;
+                size = reverse_edges[current_node_id].size();
+                if (size == 0) continue;
+            }
+
 #ifdef USE_SSE
             _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
             _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
@@ -478,8 +484,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             int neighbor_couter = 0;
 
 
-            for (size_t j = 1; j <= size; j++) {
 
+            for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
 
 
@@ -1577,7 +1583,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         
     }
     void get_reverse_edges() {
-        reverse_edges.resize(max_elements_, std::vector<labeltype>(0));
+        reverse_edges.resize(max_elements_, std::vector<tableint>(0));
         for (int cur = 0; cur < max_elements_; cur++) {
             int *data = (int *) get_linklist0(cur);
             for (int j = 1; j <= *data; j++) {

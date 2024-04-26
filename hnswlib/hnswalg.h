@@ -74,8 +74,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
     Config *config;
     std::vector<dir_vector::Dir_Vector*> * dir_vectors_ptr;
+
+
     std::vector<std::vector<tableint> > reverse_edges;
-    
+    std::vector<std::vector<tableint> > neighbors;
+    int reverse_edge_limit;
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
@@ -380,6 +383,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         static int calc_avoid = 0;
         static int cands_num = 0;
         static int wrong_throw = 0;
+
+        if (config->statis_ep_dis) {
+            config->ep_dist.push_back(-candidate_set.top().first);
+        }
+
         while (!candidate_set.empty()) {
 
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
@@ -466,11 +474,16 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
             // std::cout << "---------------------\n";
 
+
             if (config->use_reverse_edges) {
                 data = reinterpret_cast<int*>((void*)reverse_edges[current_node_id].data()) - 1;
                 size = reverse_edges[current_node_id].size();
                 if (size == 0) continue;
             }
+
+            // data = reinterpret_cast<int*>((void*)neighbors[current_node_id].data()) - 1;
+            // size = neighbors[current_node_id].size();
+            if (size == 0) continue;
 
 #ifdef USE_SSE
             _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
@@ -1566,6 +1579,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::cout << "integrity ok, checked " << connections_checked << " connections\n";
     }
 
+
     void degree_adjust(int eo, int ei);
     void reconstructGraphWithConstraint(int eo, int ei);
     void statis_indegree() {
@@ -1590,7 +1604,57 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 int nn = data[j];
                 reverse_edges[nn].push_back(cur);
             }
-                
+        }
+    }
+    void get_neighbors() {
+        neighbors.resize(max_elements_, std::vector<tableint>(0));
+        if (reverse_edges.size() == 0) {
+            std::cout << "get reverse edges first\n";
+            return ;
+        }
+        
+        std::vector<int> indegree(this->max_elements_);
+        for (int cur = 0; cur < max_elements_; cur++)
+            indegree[cur] = reverse_edges[cur].size();
+
+        int indegree_limit = this->M_ * 3;
+
+        for (int cur = 0; cur < max_elements_; cur++) {
+            int *data = (int *) get_linklist0(cur);
+
+            std::unordered_set<tableint> exist;
+            for (int j = 1; j <= *data; j++) {
+                int nn = data[j];
+                exist.insert(nn);
+            }
+
+            std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> reverse_candidates;
+            
+            for (auto nn: reverse_edges[cur]) {
+                if (exist.find(nn) == exist.end()) {
+                    if (indegree[nn] > indegree_limit) {
+                        continue;
+                    }
+                     // not exist
+                    dist_t d = this->fstdistfunc_(getDataByInternalId(cur), getDataByInternalId(nn), this->dist_func_param_);
+                    reverse_candidates.push(std::make_pair(d, nn));
+                }
+            }
+
+            getNeighborsByHeuristic2(reverse_candidates, this->M_/2);
+
+            for (int j = 1; j <= *data; j++) {
+                int nn = data[j];
+                neighbors[cur].push_back(nn);
+            }
+            if (reverse_candidates.size() > 0) {
+                std::cout << "cur = " << cur << ' ' << reverse_candidates.size() << "\n";
+            }
+            while(reverse_candidates.size()) {
+                neighbors[cur].push_back(reverse_candidates.top().second);
+                indegree[reverse_candidates.top().second] ++ ;
+                reverse_candidates.pop();
+            }
         }
     }
 };

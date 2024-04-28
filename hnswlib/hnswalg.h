@@ -339,6 +339,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         dist_t lowerBound;
         if (bare_bone_search || 
             (!isMarkedDeleted(ep_id) && ((!isIdAllowed) || (*isIdAllowed)(getExternalLabel(ep_id))))) {
+
             char* ep_data = getDataByInternalId(ep_id);
             dist_t dist = fstdistfunc_(data_point, ep_data, dist_func_param_);
             lowerBound = dist;
@@ -348,6 +349,24 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
             candidate_set.emplace(-dist, ep_id);
 
+            if (config->use_multiple_ep) {
+                auto &eps = config->eps;
+                if (eps.size() > 1) {
+                    eps.pop();
+                    while (eps.size()) {
+                        candidate_set.emplace(-eps.top().first, eps.top().second);
+                        eps.pop();
+                    }
+                }
+                // std::cout << "add " << candidate_set.size() << "\n";
+            }
+
+            if (config->test_ep_with_calc) {
+                if (dist <= config->ep_dist_limit) {
+                    config->ep_is_in_limit = 1;
+                    config->ep_in_limit_cnt++;
+                } else config->ep_is_in_limit = 0;
+            }
 
             // config 
             config->search_knn_times ++ ;
@@ -534,9 +553,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                     if (config->statis_used_neighbor_dist) {
                         if (config->all_points.find(candidate_id) != config->all_points.end()) {
-                            exit(-1);
+                            std::cout << __FILE__ << " " << __LINE__ << "\n";
                         }
                         config->all_points.insert(candidate_id);
+                    }
+
+                    if (config->test_ep_with_calc) {
+                        if (config->ep_is_in_limit) {
+                            config->ep_tot_dis_calc++;
+                        }
                     }
 
                     bool flag_consider_candidate;
@@ -1445,9 +1470,21 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         tableint currObj = enterpoint_node_;
         dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
 
+        // clear
+        if (config->use_multiple_ep) {
+            while(config->eps.size()) config->eps.pop();
+        }
+
         for (int level = maxlevel_; level > 0; level--) {
+
+            if (config->use_multiple_ep) {
+                config->eps.push(std::make_pair(curdist, currObj));
+            }
+
             bool changed = true;
             while (changed) {
+                
+
                 changed = false;
                 unsigned int *data;
 
@@ -1467,11 +1504,25 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                         curdist = d;
                         currObj = cand;
                         changed = true;
+
+                        if (config->use_multiple_ep) {
+                            config->eps.push(std::make_pair(curdist, currObj));
+                            if (config->eps.size() > config->ep_cnt)
+                                config->eps.pop();
+                        }
+
                     }
                 }
             }
         }
 
+        if (config->use_multiple_ep) {
+            while (config->eps.size()) {
+                if (config->eps.top().first > 1.2 * curdist) config->eps.pop();
+                else break;
+            }
+        }
+        
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
         bool bare_bone_search = !num_deleted_ && !isIdAllowed;
         if (bare_bone_search) {

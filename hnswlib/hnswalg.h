@@ -79,6 +79,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::vector<std::vector<tableint> > reverse_edges;
     std::vector<std::vector<tableint> > neighbors;
     int reverse_edge_limit;
+    std::vector<std::vector<dist_t> > neighbor_dist;
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
@@ -337,6 +338,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> candidate_set;
 
         dist_t lowerBound;
+        dist_t lowerBoundSqrt;
         if (bare_bone_search || 
             (!isMarkedDeleted(ep_id) && ((!isIdAllowed) || (*isIdAllowed)(getExternalLabel(ep_id))))) {
 
@@ -382,6 +384,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_array[ep_id] = visited_array_tag;
 
+        float ep_dist, nn_dist = 1e9;
+        ep_dist = lowerBound;
 
         // dir vector prediction
         StopW timer;
@@ -407,10 +411,14 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             config->ep_dist.push_back(-candidate_set.top().first);
         }
 
+        lowerBoundSqrt = sqrt(lowerBound);
         while (!candidate_set.empty()) {
 
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
             dist_t candidate_dist = -current_node_pair.first;
+            dist_t candidate_dist_sqrt = sqrt(candidate_dist);
+
+            nn_dist = min(nn_dist, (float)candidate_dist);
 
             bool flag_stop_search;
             if (bare_bone_search) {
@@ -521,6 +529,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 int candidate_id = *(data + j);
 
 
+                // The Triangle Inequality
+                if (candidate_set.size() >= ef && lowerBoundSqrt <= candidate_dist_sqrt - neighbor_dist[current_node_id][j-1]) continue;
+
 #ifdef USE_SSE
                 _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
                 _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
@@ -609,8 +620,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                             }
                         }
 
-                        if (!top_candidates.empty())
+                        if (!top_candidates.empty()) {
                             lowerBound = top_candidates.top().first;
+                            lowerBoundSqrt = sqrt(lowerBound);
+                        }
                     }
                 }
             }
@@ -624,6 +637,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         }
         visited_list_pool_->releaseVisitedList(vl);
 
+        if (config->statis_ep_nn_pair) {
+            config->ep_nn_pair.push_back(make_pair(ep_dist, nn_dist));
+        }
 
         return top_candidates;
     }
@@ -1707,6 +1723,20 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 reverse_candidates.pop();
             }
         }
+    }
+
+    void calc_neighbor_dist() {
+        neighbor_dist.resize(max_elements_);
+        for (int cur = 0; cur < max_elements_; cur++) {
+            int *data = (int *) get_linklist0(cur);
+            neighbor_dist[cur].resize(*data);
+            for (int j = 1; j <= *data; j++) {
+                int nn = data[j];
+                dist_t d = this->fstdistfunc_(getDataByInternalId(cur), getDataByInternalId(nn), this->dist_func_param_);
+                neighbor_dist[cur][j-1] = sqrt(d);
+            }
+        }
+
     }
 };
 }  // namespace hnswlib

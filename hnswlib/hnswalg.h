@@ -80,6 +80,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::vector<std::vector<tableint> > neighbors;
     int reverse_edge_limit;
     std::vector<std::vector<dist_t> > neighbor_dist;
+    std::vector<std::vector<tableint> > neighbors_adjust;
 
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
@@ -406,17 +407,38 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         static int calc_avoid = 0;
         static int cands_num = 0;
         static int wrong_throw = 0;
-
         if (config->statis_ep_dis) {
             config->ep_dist.push_back(-candidate_set.top().first);
         }
 
-        lowerBoundSqrt = sqrt(lowerBound);
-        while (!candidate_set.empty()) {
+        // clear
+        bool begin_recursive = 0;
+        bool find_nearer = 0;
+        if (config->statis_recursive_len) {
+            config->recursive_len = 0;
+        }
+        
+        config->nn_path_len = 0;
+        config->find_nn = 0;
 
+        lowerBoundSqrt = sqrt(lowerBound);
+
+        while (!candidate_set.empty()) {
+            if (config->statis_recursive_len && !begin_recursive) {
+                config->recursive_len++;
+            }
+            if (config->test_nn_path_len && !config->find_nn) {
+                config->nn_path_len++;
+            }
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
             dist_t candidate_dist = -current_node_pair.first;
             dist_t candidate_dist_sqrt = sqrt(candidate_dist);
+
+            if (config->test_nn_path_len && fabs(sqrt(candidate_dist) - config->nn_dist) < 1e-7) {
+                config->find_nn = 1;
+            }
+            
+            
 
             nn_dist = min(nn_dist, (float)candidate_dist);
 
@@ -508,6 +530,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 if (size == 0) continue;
             }
 
+            if (config->use_degree_adjust) {
+                data = reinterpret_cast<int*>((void*)neighbors_adjust[current_node_id].data()) - 1;
+                size = neighbors_adjust[current_node_id].size();
+            }
+
             // data = reinterpret_cast<int*>((void*)neighbors[current_node_id].data()) - 1;
             // size = neighbors[current_node_id].size();
             if (size == 0) continue;
@@ -523,13 +550,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
             int neighbor_couter = 0;
 
-
+            // 找到了更近的邻居
+            bool find_nearer = 0;
 
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
 
-
                 // The Triangle Inequality
+                if (neighbor_dist.size() <= current_node_id) {
+                    cout << __FILE__ << " " << __LINE__ << " calc neighbor dist first\n";
+                    exit(0);
+                }
                 if (candidate_set.size() >= ef && lowerBoundSqrt <= candidate_dist_sqrt - neighbor_dist[current_node_id][j-1]) continue;
 
 #ifdef USE_SSE
@@ -554,6 +585,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                    if (dist < candidate_dist) find_nearer = 1;
 
                     config->tot_dist_calc ++ ;
                     tot_calc++;
@@ -628,6 +660,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 }
             }
 
+            if (!find_nearer && !begin_recursive) {
+                cout << __LINE__ << "begin recursive " << current_node_id << " now dist = " << sqrt(candidate_dist) << "\n";
+                begin_recursive = 1;
+            }
             // exit(0);
         }
         // std::cout << "cands num " << cands_num << " tot calc " << tot_calc << " calc avoid " << calc_avoid << " wrong throw " << wrong_throw << '\n';
@@ -1395,6 +1431,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         config->max_level = std::max(config->max_level, curlevel);
 
+        // static int levelcnt[4] = {0};
+        // if (curlevel <= 3) {
+        //     levelcnt[curlevel]++;
+        // }
+        // if (label == 99999) {
+        //     std::cout << levelcnt[1] << ' ' << levelcnt[2] << ' ' << level[3];
+        //     exit(0);
+        // }
+        
         element_levels_[cur_c] = curlevel;
 
         std::unique_lock <std::mutex> templock(global);
@@ -1491,8 +1536,34 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             while(config->eps.size()) config->eps.pop();
         }
 
+            
         for (int level = maxlevel_; level > 0; level--) {
-
+            if (level >= 1 && config->test_bruteforce_ep) {
+                std::queue<int> q;
+                std::unordered_set<int> exist;
+                q.push(currObj);
+                exist.insert(currObj);
+                while (!q.empty()) {
+                    int cur = q.front();
+                    q.pop();
+                    unsigned int *data;
+                    data = (unsigned int *) get_linklist(cur, level);
+                    int size = getListCount(data);
+                    tableint *datal = (tableint *) (data + 1);
+                    for (int i = 0; i < size; i++) {
+                        tableint cand = datal[i];
+                        if (exist.find(cand) != exist.end()) continue;
+                        exist.insert(cand);
+                        q.push(cand);
+                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
+                        if (d < curdist) {
+                            curdist = d;
+                            currObj = cand;
+                        }
+                    }
+                }
+                continue;
+            }
             if (config->use_multiple_ep) {
                 config->eps.push(std::make_pair(curdist, currObj));
             }
@@ -1515,7 +1586,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     if (cand < 0 || cand > max_elements_)
                         throw std::runtime_error("cand error");
                     dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
-
+                    config->high_level_dist_calc++;
                     if (d < curdist) {
                         curdist = d;
                         currObj = cand;
@@ -1531,6 +1602,34 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 }
             }
         }
+
+        // } else if (1) {
+        //     int cnt = 0;
+        //     std::queue<int> q;
+        //     std::unordered_set<int> exist;
+        //     q.push(currObj);
+        //     exist.insert(currObj);
+        //     while (!q.empty()) {
+        //         int cur = q.front();
+        //         cnt ++ ;
+        //         q.pop();
+        //         unsigned int *data;
+        //         data = (unsigned int *) get_linklist(cur, 1);
+        //         int size = getListCount(data);
+        //         tableint *datal = (tableint *) (data + 1);
+        //         for (int i = 0; i < size; i++) {
+        //             tableint cand = datal[i];
+        //             if (exist.find(cand) != exist.end()) continue;
+        //             exist.insert(cand);
+        //             q.push(cand);
+        //             dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
+        //             if (d < curdist) {
+        //                 curdist = d;
+        //                 currObj = cand;
+        //             }
+        //         }
+        //     }
+        // }
 
         if (config->use_multiple_ep) {
             while (config->eps.size()) {
@@ -1649,6 +1748,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
     void degree_adjust(int eo, int ei);
     void reconstructGraphWithConstraint(int eo, int ei);
+    void reconstructGraph(int eo, int ei);
     void statis_indegree() {
         std::vector<int> indegree(max_elements_, 0);
         
@@ -1664,6 +1764,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         
     }
     void get_reverse_edges() {
+        cout << __LINE__ << " get reverse edges\n";
         reverse_edges.resize(max_elements_, std::vector<tableint>(0));
         for (int cur = 0; cur < max_elements_; cur++) {
             int *data = (int *) get_linklist0(cur);
@@ -1674,6 +1775,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         }
     }
     void get_neighbors() {
+        std::cout << __LINE__ << " get neigbhors\n";
         neighbors.resize(max_elements_, std::vector<tableint>(0));
         if (reverse_edges.size() == 0) {
             std::cout << "get reverse edges first\n";
@@ -1714,18 +1816,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 int nn = data[j];
                 neighbors[cur].push_back(nn);
             }
-            if (reverse_candidates.size() > 0) {
-                std::cout << "cur = " << cur << ' ' << reverse_candidates.size() << "\n";
-            }
             while(reverse_candidates.size()) {
                 neighbors[cur].push_back(reverse_candidates.top().second);
                 indegree[reverse_candidates.top().second] ++ ;
                 reverse_candidates.pop();
             }
         }
+        std::cout << __LINE__ << " get neigbhors finished\n";
     }
 
     void calc_neighbor_dist() {
+        std::cout << __LINE__ << "calc neighbor dist\n";
         neighbor_dist.resize(max_elements_);
         for (int cur = 0; cur < max_elements_; cur++) {
             int *data = (int *) get_linklist0(cur);

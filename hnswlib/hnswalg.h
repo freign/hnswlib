@@ -403,7 +403,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         }
 
 
-        static int tot_calc = 0;
+        int local_tot_calc = 0;
         static int calc_avoid = 0;
         static int cands_num = 0;
         static int wrong_throw = 0;
@@ -436,6 +436,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
             if (config->test_nn_path_len && fabs(sqrt(candidate_dist) - config->nn_dist) < 1e-7) {
                 config->find_nn = 1;
+                config->dist_calc_when_nn = local_tot_calc;
             }
             
             
@@ -588,7 +589,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     if (dist < candidate_dist) find_nearer = 1;
 
                     config->tot_dist_calc ++ ;
-                    tot_calc++;
+                    local_tot_calc++;
 
                     if (config->statis_wasted_cand) {
                         config->tot_calculated_nodes++;
@@ -661,7 +662,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
 
             if (!find_nearer && !begin_recursive) {
-                cout << __LINE__ << "begin recursive " << current_node_id << " now dist = " << sqrt(candidate_dist) << "\n";
+                // cout << __LINE__ << "begin recursive " << current_node_id << " now dist = " << sqrt(candidate_dist) << "\n";
                 begin_recursive = 1;
             }
             // exit(0);
@@ -1502,7 +1503,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     if (top_candidates.size() > ef_construction_)
                         top_candidates.pop();
                 }
+
                 currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates, level, false);
+
+
             }
         } else {
             // Do nothing for the first element
@@ -1745,6 +1749,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::cout << "integrity ok, checked " << connections_checked << " connections\n";
     }
 
+    void print_neighbor0(int cur) {
+        int *data = (int*)get_linklist0(cur);
+        cout << "nrighbor of " << cur << "\n";
+        for (int i = 1; i <= *data; i++) {
+            dist_t d = this->fstdistfunc_(getDataByInternalId(cur), getDataByInternalId(data[i]), this->dist_func_param_);
+            cout << data[i] << ' ' << d << "\n";
+        }
+        cout << "\n";
+    }
 
     void degree_adjust(int eo, int ei);
     void reconstructGraphWithConstraint(int eo, int ei);

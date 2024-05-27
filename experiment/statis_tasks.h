@@ -20,9 +20,11 @@ public:
         CommandLineOptions *opt,
         DataLoader *_data_loader,
         DataLoader *_query_data_loader,
+        GroundTruth::GT_Loader *_gt_loader,
         hnswlib::SpaceInterface<dist_t> *_space,
         string dist_t_type,
-        Config *_config): M(16), ef_construction(200) {
+        int _M,
+        Config *_config): M(_M), ef_construction(200) {
 
         data_dir = opt->dataDir;
         data_path = opt->point_data_path;
@@ -31,15 +33,16 @@ public:
 
         data_loader = _data_loader;
         query_data_loader = _query_data_loader;
+        gt_loader = _gt_loader;
         space = _space;
         config = _config;
 
         GroundTruth::calc_gt(data_dir, data_loader, query_data_loader, *space, 0);
-        gt_loader = new GroundTruth::GT_Loader(data_dir, data_loader, query_data_loader);
+        // gt_loader = new GroundTruth::GT_Loader(data_dir, data_loader, query_data_loader);
 
         alg_hnsw = new hnswlib::HierarchicalNSW<dist_t>(space, max_elements, M, ef_construction);
         alg_hnsw->config = config;
-        
+
         // build_graph();
 
         // data_loader->free_data();
@@ -56,14 +59,40 @@ public:
 
     void test() {
         build_graph();
+        alg_hnsw->get_extent_neighbors();
+        config->statis_recursive_len = 1;
         config->use_dir_vector = 0;
+        config->statis_ep_dis = 1;
+        config->statis_ep_nn_pair = 1;
+        config->high_level_dist_calc = 0;
+        config->test_nn_path_len = 1;
+        config->use_extent_neighbor = 0;
+        
+        if (config->use_extent_neighbor) {
+            cout << "use extent neighbors\n";
+        }
         if (config->use_dir_vector) {
             cout << "use dir vector\n";
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;
         }
 
-        test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
+        config->test_ep_with_calc = 1;
+        config->ep_dist_limit = 0.4;
+
+        if (config->use_degree_adjust) {
+            cout << "use degree adjustment\n";
+            alg_hnsw->degree_adjust(16, 64);
+        }
+
+        config->test_bruteforce_ep = 0;
+        if (config->test_bruteforce_ep) {
+            cout << "test brute force ep\n";
+        }
+
+        alg_hnsw->get_neighbors();
+        test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
+        cout << "query elements: " << query_data_loader->get_elements() << "\n";
         cout << "max level = " << config->max_level << "\n";
         cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
     }
@@ -72,6 +101,21 @@ public:
         for (int i = 0; i < data_loader->get_elements(); i++) {
             alg_hnsw->addPoint(data_loader->point_data(i), i);
         }
+        alg_hnsw->calc_neighbor_dist();
+
+
+        // vector<int> tem;
+        // for (int i = 0; i < max_elements; i++) {
+        //     if (alg_hnsw->element_levels_[i] == 1) tem.push_back(i);
+        // }
+        // for (int i = 0; i < tem.size(); i+=10) {
+        //     for (int j = i+1; j < tem.size(); j++) {
+        //         dist_t d = space->get_dist_func()(data_loader->point_data(tem[i]),
+        //             data_loader->point_data(tem[j]), space->get_dist_func_param());
+        //         cout << d << "\n";
+        //     }
+        // }
+        // exit(0);
 
         cout << "build graph finished\n";
     }
@@ -87,6 +131,18 @@ public:
     vector<dir_vector::Dir_Vector*> dir_vectors;
 
     void test_k_means();
+
+    void test_degree_adjustment();
+    void statis_indegree() {
+        build_graph();
+        alg_hnsw->statis_indegree();
+    }
+
+    void test_reverse();
+
+    void test_multi_ep();
+
+    void test_ep_dist_calc();
 private:
     string data_dir;
     string data_path;
@@ -178,7 +234,6 @@ void Tester<dist_t>::calc_dir_vector() {
             for (auto n: neighbors) {
                 dir_vectors[i]->calc_dir_vector_float(data_loader->point_data(i),
                     data_loader->point_data(n), tot);
-                
                 tot++;
             }
         }
@@ -189,10 +244,10 @@ void Tester<dist_t>::calc_dir_vector() {
 template<typename dist_t>
 void Tester<dist_t>::test_dir_vector() {
     using dir_vector::Dir_Vector;
-    config->test_dir_vector = 1;
-
+    config->use_dir_vector = 1;
+    cout << "use dir vector\n";
     calc_dir_vector();
-
+    exit(0);
     size_t qsize = query_data_loader->get_elements();
     
     hnswlib::SpaceInterface<int> *space = new hnswlib::L2SpaceI(data_loader->get_dim());
@@ -216,8 +271,7 @@ void Tester<dist_t>::test_dir_vector() {
         for (int j = 0; j < l1_dis.size(); j++) {
             l1_dis[j] = abs(v_data[j] - q_data[j]);
         }
-        for (auto l1: l1_dis) cout << l1 << ' '; cout << '\n';
-
+        // for (auto l1: l1_dis) cout << l1 << ' '; cout << '\n';
         priority_queue<pair<int, int> > neighbor_dists;
         for (int j = 0; j < neighbors.size(); j++) {
             auto n = neighbors[j];
@@ -255,9 +309,6 @@ void Tester<dist_t>::test_k_means() {
         for (int j = 0; j <= l; j++)
             num_layer[j]++;
     }
-    
-    for (auto num: num_layer)
-        cout << num << '\n';
     vector<int>().swap(levels);
 
     vector<int> ids_for_cluster;
@@ -268,49 +319,19 @@ void Tester<dist_t>::test_k_means() {
         ids_for_cluster[i] = i;
 
     vector<vector<int> > high_layer_points(1);
-
     if (is_same<float, dist_t>::value) {
-        for (int l = 1; l <= max_level; l++) {
-            cout << "l = " << l << ' ' << ids_for_cluster.size() << ' ' << num_layer[l] << endl;
+        
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(this->data_loader->get_dim());
+        for (int l = 1; l < num_layer.size(); l++) {
+            auto *kmeans = new KMeans<float, float>(num_layer[l], ids_for_cluster.size(), this->data_loader->get_dim(),
+                space, this->data_loader, ids_for_cluster);
 
-            if (num_layer[l] >= 1000) {
-                random_shuffle(ids_for_cluster.begin(), ids_for_cluster.end());
-                ids_for_cluster.resize(num_layer[l]);
-                high_layer_points.push_back(ids_for_cluster);
-
-            } else {
-
-                KMeans<dist_t, float> *k_means = new KMeans<dist_t, float>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
-                    space, data_loader, ids_for_cluster);
-
-                k_means->run(5);
-
-                // for (int i = 0; i < 3; i++) {
-                //     KMeans<dist_t, float> *new_k_means = new KMeans<dist_t, float>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
-                //         space, data_loader, ids_for_cluster);
-                    
-                //     new_k_means->run(5);
-                //     if (new_k_means->tot_dist() < k_means->tot_dist())
-                //         swap(new_k_means, k_means);
-
-                //     delete new_k_means;
-                // }
-
-                auto centers = k_means->get_centers_global();
-                high_layer_points.push_back(centers);
-                
-                ids_for_cluster = centers;
-                delete k_means;
-            }
-            
-        }
-    } else if (is_same<int, dist_t>::value) {
-        for (int l = 1; l <= max_level; l++) {
-            KMeans<dist_t, int64_t> *k_means = new KMeans<dist_t, int64_t>(num_layer[l], ids_for_cluster.size(), data_loader->get_dim(),
-                space, data_loader, ids_for_cluster);
+            kmeans->run();
+            high_layer_points.push_back(kmeans->find_center_point_global_id());
+            delete kmeans;
+            ids_for_cluster = high_layer_points.back();
         }
     }
-
     {
         cout << "build graph begin\n";
         unordered_set<int> added;
@@ -318,16 +339,77 @@ void Tester<dist_t>::test_k_means() {
             for (auto p: high_layer_points[l]) {
                 if (added.find(p) != added.end()) continue;
                 added.insert(p);
+                // cout << "add " << p << " " << l << "\n";
                 alg_hnsw->addPoint(data_loader->point_data(p), p, l);
             }
         }
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < N; i++) {
             if (added.find(i) == added.end()) {
                 alg_hnsw->addPoint(data_loader->point_data(i), i, 0);
             }
+        }
 
         vector<vector<int> >().swap(high_layer_points);
+        vector<int>().swap(ids_for_cluster);
         cout << "build graph finished\n";
+        alg_hnsw->calc_neighbor_dist();
     }
-    test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10);
+    test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_degree_adjustment() {
+    M = 16;
+    if (alg_hnsw != nullptr) delete alg_hnsw;
+    alg_hnsw = new hnswlib::HierarchicalNSW<dist_t>(space, max_elements, M, ef_construction);
+    config->use_degree_adjust = 1;
+    alg_hnsw->config = config;
+    test();
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_reverse() {
+    build_graph();
+    config->use_reverse_edges = 1;
+
+    alg_hnsw->get_reverse_edges();
+    alg_hnsw->get_neighbors();
+
+    test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
+    cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_multi_ep() {
+    build_graph();
+
+    config->use_multiple_ep = 1;
+    alg_hnsw->get_neighbors();
+
+
+    test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
+
+    cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
+
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_ep_dist_calc() {
+    build_graph();
+
+
+    config->test_ep_with_calc = 1;
+
+    int ef = 70;
+    alg_hnsw->setEf(ef);
+
+    for (float i = 0.2; i < 4; i += 0.2) {
+        config->tot_dist_calc = 0;
+        config->ep_dist_limit = i * i;
+        config->clear_test_ep();
+        test_approx(query_data_loader, gt_loader, alg_hnsw, 10);
+        cout << "limit = " << sqrt(config->ep_dist_limit) << "\tcnt = " << config->ep_in_limit_cnt << "\tavg dist = " << 1.0 * config->ep_tot_dis_calc / config->ep_in_limit_cnt << "\n";
+    }
+
+
 }

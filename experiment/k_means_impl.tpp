@@ -23,8 +23,8 @@ KMeans<dist_t, sum_type_t>::KMeans(int _k, int _N, int _dim, hnswlib::SpaceInter
     dis2centroid.resize(N, 1e9);
 }
 
-std::random_device rd; // 用于获取随机数种子
-std::mt19937 gen(rd()); // 标准 mersenne_twister_engine
+static std::random_device rd; // 用于获取随机数种子
+static std::mt19937 gen(rd()); // 标准 mersenne_twister_engine
 int rand_int(int l, int r) {
     std::uniform_int_distribution<> dis(l, r); // 定义在[min, max]范围内的均匀分布
     return dis(gen);
@@ -122,70 +122,6 @@ void KMeans<dist_t, sum_type_t>::updateCenters() {
             centroids[i][j] = tem[i][j] / cluster_nums[i];
     
     return ;
-    // // 对每个簇，找到新的中心
-    // for (int j = 0; j < k; ++j) {
-    //     int lst_center = centers[j];
-    //     int num = cluster_nums[j];
-    //     sum_type_t min_dist_sum = std::numeric_limits<dist_t>::max();
-    //     int best_center = -1;
-        
-    //     vector<sum_type_t> sum_l1(dim, 0), sum_l2(dim, 0);
-
-    //     for (int i = 0; i < N; ++i) { // 尝试将每个点作为新中心
-    //         if (assignments[i] != j) continue; // 只考虑当前簇中的点
-
-    //         if (std::is_same<dist_t, float>::value) {
-    //             const float *point = reinterpret_cast<const float*>(data_loader->point_data(globalIDS[i]));
-    //             for (int d = 0; d < dim; d++) {
-    //                 sum_l1[d] += point[d];
-    //                 sum_l2[d] += point[d] * point[d];
-    //             }
-    //         } else {
-    //             const uint8_t *point = reinterpret_cast<const uint8_t*>(data_loader->point_data(globalIDS[i]));
-    //             for (int d = 0; d < dim; d++) {
-    //                 sum_l1[d] += point[d];
-    //                 sum_l2[d] += (sum_type_t)point[d] * point[d];
-    //             }
-
-    //         }
-    //     }
-
-    //     for (int i = 0; i < N; ++i) { // 尝试将每个点作为新中心
-    //         if (assignments[i] != j) continue; // 只考虑当前簇中的点
-    //         sum_type_t sum_dis = 0;
-
-    //         if (std::is_same<dist_t, float>::value) {
-    //             const float *point = reinterpret_cast<const float*>(data_loader->point_data(globalIDS[i]));
-    //             for (int d = 0; d < dim; d++) {
-    //                 sum_dis += (sum_type_t)point[d] * point[d] * num;
-    //                 sum_dis -= 2 * sum_l1[d] * point[d];
-    //                 sum_dis += sum_l2[d];
-    //             }
-    //         } else {
-    //             const uint8_t *point = reinterpret_cast<const uint8_t*>(data_loader->point_data(globalIDS[i]));
-    //             for (int d = 0; d < dim; d++) {
-    //                 sum_dis += (sum_type_t)point[d] * point[d] * num;
-    //                 sum_dis -= 2 * (sum_type_t)sum_l1[d] * point[d];
-    //                 sum_dis += sum_l2[d];
-    //             }
-
-    //         }
-    //         if (sum_dis < min_dist_sum) {
-    //             min_dist_sum = sum_dis;
-    //             best_center = i;
-    //         }
-    //     }
-
-    //     if (best_center != -1) { // 更新簇中心
-    //         centers[j] = best_center;
-    //     }
-    //     int64_t tem_sum = 0;
-    //     for (int i = 0; i < N; i++) {
-    //         if (assignments[i] != j) continue;
-    //         // tem_sum += dis(centers[j], i);
-    //         tem_sum += dis(lst_center, i);
-    //     }
-    // }
 }
 
 template<typename dist_t, typename sum_type_t>
@@ -204,7 +140,6 @@ void KMeans<dist_t, sum_type_t>::run(int maxIterations) {
     updateCenterDis();
 
     for (int iter = 0; iter < maxIterations; ++iter) {
-        // cout << "iter = " << iter << '\n';
         assignPointsToClosestCenter();
 
         auto lst_centers = centroids;
@@ -212,6 +147,7 @@ void KMeans<dist_t, sum_type_t>::run(int maxIterations) {
         updateCenters();
         updateCenterDis();
 
+        cout << "iter = " << iter << ' ' << this->tot_dist_recalc() << '\n';
         bool changed = 0;
         for (int j = 0; j < k; j++)
             for (int d = 0; d < dim; d++) {
@@ -347,7 +283,7 @@ vector<uint32_t> KMeans<dist_t, sum_type_t>::searchKnn(const void* data_point, i
     return result;
 }
 template<typename dist_t, typename sum_type_t>
-dist_t * KMeans<dist_t, sum_type_t>::get_assign(int id) {
+inline dist_t * KMeans<dist_t, sum_type_t>::get_assign(int id) {
     return centroids[assignments[id]].data();
 }
 
@@ -385,4 +321,19 @@ vector<uint32_t> KMeans<dist_t, sum_type_t>::searchKnn_prune(const void* data_po
     }
     reverse(result.begin(), result.end());
     return result;
+}
+
+template<typename dist_t, typename sum_type_t>
+vector<int> KMeans<dist_t, sum_type_t>::find_center_point_global_id() {
+    vector<int> center_points(this->k);
+    vector<sum_type_t> center_dis(this->k, 1e9);
+    for (int i = 0; i < N; i++) {
+        int belong = assignments[i];
+        auto dist = dis(i, get_assign(i));
+        if (dist < center_dis[belong]);
+        center_points[belong] = i;
+    }
+    for (auto &c: center_points)
+        c = globalIDS[c];
+    return center_points;
 }

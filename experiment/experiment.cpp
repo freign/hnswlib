@@ -24,10 +24,14 @@ void begin_tst(Tester<dist_t> *rt, Config *config) {
     // rt->test_dir_vector();
     // rt->test_distribution();
     // rt->test_k_means();
-
+    // rt->test_degree_adjustment();
+    // rt->test_reverse();
+    // rt->test_multi_ep();
+    // rt->test_ep_dist_calc();
     cout << "avg ep dist = " << config->ep_dis_tot / config->search_knn_times << '\n';
     delete rt;
 }
+
 
 int main(int argc, char *argv[]) {
 
@@ -47,25 +51,28 @@ int main(int argc, char *argv[]) {
     if (opt.dataName == "bigann") {
         data_loader = new DataLoader("u8", opt.maxElements, opt.point_data_path, "bigann");
         query_data_loader = new DataLoader("u8", 0, opt.query_data_path, "bigann");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
         hnswlib::SpaceInterface<int> *space = new hnswlib::L2SpaceI(data_loader->get_dim());
 
-        auto *rt = new Tester<int>(&opt, data_loader, query_data_loader, space, "u8", config);
+        auto *rt = new Tester<int>(&opt, data_loader, query_data_loader, gt_loader, space, "u8", M, config);
         begin_tst(rt, config);
 
     } else if (opt.dataName == "yandex") {
         data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "yandex");
         query_data_loader = new DataLoader("f", 0, opt.query_data_path, "yandex");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
         hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
 
-        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, space, "f", config);
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
         begin_tst(rt, config);
 
     } else if (opt.dataName == "gist") {
         data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "gist");
         query_data_loader = new DataLoader("f", 0, opt.query_data_path, "gist");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
         hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
-
-        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, space, "f", config);
+    
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
         begin_tst(rt, config);
 
     }

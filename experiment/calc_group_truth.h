@@ -9,6 +9,8 @@ using DATALOADER::DataLoader;
 
 namespace GroundTruth {
 
+class GT_Loader;
+
 template<typename dist_t>
 void calc_gt(std::string data_dir, 
     DataLoader *data_loader, 
@@ -59,6 +61,8 @@ void calc_gt(std::string data_dir,
         output_file.write(reinterpret_cast<const char*>(nearestK.data()), sizeof(uint32_t) * nearestK.size());
     }
 }
+
+
 
 class GT_Loader {
 public:
@@ -116,5 +120,20 @@ private:
     std::ifstream file;
     uint32_t K;
 };
+
+template<typename dist_t>
+void verify_gt(DataLoader *data_loader, 
+    DataLoader *query_data_loader,
+    hnswlib::SpaceInterface<dist_t> &space,
+    GT_Loader *gt_loader,
+    int id) {
+
+    std::cout << "verify " << id << "\n";
+    auto gt = gt_loader->get_knn_gt(id);
+    for (auto g: gt) {
+        dist_t d = space.get_dist_func()(data_loader->point_data(g), query_data_loader->point_data(id), space.get_dist_func_param());
+        cout << g << ' ' << sqrt(d) << "\n";
+    }
+}
 
 }

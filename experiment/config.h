@@ -2,6 +2,7 @@
 
 #include <bits/stdc++.h>
 #include "timer.h"
+using namespace std;
 
 struct Config {
 
@@ -43,5 +44,42 @@ struct Config {
 
     bool use_degree_adjust = 0;
     
+    bool use_reverse_edges = 0;
+
+    // 测试最底层接入点距离
+    bool statis_ep_dis;
+    std::vector<float> ep_dist;
+
+    bool use_multiple_ep;
+    int ep_cnt = 10;
+    std::priority_queue<std::pair<float, int> > eps;
+
+    bool test_ep_with_calc = 0;
+    float ep_dist_limit;
+    int ep_in_limit_cnt;
+    int ep_tot_dis_calc;
+    bool ep_is_in_limit;
+    void clear_test_ep() {
+        ep_in_limit_cnt = 0;
+        ep_tot_dis_calc = 0;
+    }
+    
+    bool statis_ep_nn_pair = 0;
+    vector<pair<float, float> > ep_nn_pair;
+
+    bool test_bruteforce_ep = 0;
+
+    int high_level_dist_calc = 0;
+
+    bool statis_recursive_len = 0;
+    int recursive_len = 0;
+
+    float nn_dist;
+    bool test_nn_path_len = 0;
+    bool find_nn = 0;
+    int nn_path_len = 0;
+    int dist_calc_when_nn = 0;
+
+    bool use_extent_neighbor = 0;
 };
 

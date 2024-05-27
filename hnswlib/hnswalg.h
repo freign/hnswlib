@@ -82,6 +82,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::vector<std::vector<dist_t> > neighbor_dist;
     std::vector<std::vector<tableint> > neighbors_adjust;
 
+    // 不使用启发式选择
+    std::vector<std::vector<tableint> > extent_neighbors;
+
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
 
@@ -413,6 +416,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         // clear
         bool begin_recursive = 0;
+        int step_after_recursive = 0;
+        int active_neighbor_num = 0;
         bool find_nearer = 0;
         if (config->statis_recursive_len) {
             config->recursive_len = 0;
@@ -423,7 +428,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         lowerBoundSqrt = sqrt(lowerBound);
 
+        int hop = 0;
+
         while (!candidate_set.empty()) {
+            hop++;
             if (config->statis_recursive_len && !begin_recursive) {
                 config->recursive_len++;
             }
@@ -526,14 +534,28 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
 
             if (config->use_reverse_edges) {
+                cout << __LINE__ << "\n";
+                exit(-1);
                 data = reinterpret_cast<int*>((void*)reverse_edges[current_node_id].data()) - 1;
                 size = reverse_edges[current_node_id].size();
                 if (size == 0) continue;
             }
 
             if (config->use_degree_adjust) {
+                cout << __LINE__ << "\n";
+                exit(-1);
                 data = reinterpret_cast<int*>((void*)neighbors_adjust[current_node_id].data()) - 1;
                 size = neighbors_adjust[current_node_id].size();
+            }
+
+            if (config->use_extent_neighbor) {
+                data = reinterpret_cast<int*>((void*)extent_neighbors[current_node_id].data()) - 1;
+                size = *(int *) get_linklist0(current_node_id);
+                if (begin_recursive) {
+                    // size += 15;
+                    size += active_neighbor_num;
+                    size = min(size, extent_neighbors[current_node_id].size());
+                }
             }
 
             // data = reinterpret_cast<int*>((void*)neighbors[current_node_id].data()) - 1;
@@ -616,6 +638,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     }
 
                     if (flag_consider_candidate) {
+
+                        
+
                         candidate_set.emplace(-dist, candidate_id);
 
                         if (config->statis_wasted_cand) {
@@ -661,9 +686,19 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 }
             }
 
-            if (!find_nearer && !begin_recursive) {
+            if (!find_nearer && config->statis_recursive_len && !begin_recursive) {
                 // cout << __LINE__ << "begin recursive " << current_node_id << " now dist = " << sqrt(candidate_dist) << "\n";
                 begin_recursive = 1;
+            }
+            if (begin_recursive) {
+                if (find_nearer) {
+                    active_neighbor_num = 0;
+                    if (active_neighbor_num < 0) active_neighbor_num = 0;
+                } else {
+                    if (hop%5 == 0)
+                        active_neighbor_num ++;
+                    active_neighbor_num = min(active_neighbor_num, 5);
+                }
             }
             // exit(0);
         }
@@ -752,6 +787,16 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         int level,
         bool isUpdate) {
         size_t Mcurmax = level ? maxM_ : maxM0_;
+
+        // if (level == 0) {
+        //     // 第0层保留更多的出边邻居
+        //     if (cur_c == 300) {
+        //         cout << "candidates = " << top_candidates.size() << "\n";
+        //     }
+        //     getNeighborsByHeuristic2(top_candidates, Mcurmax * 2);
+            
+        // }
+
         getNeighborsByHeuristic2(top_candidates, M_);
         if (top_candidates.size() > M_)
             throw std::runtime_error("Should be not be more than M_ candidates returned by the heuristic");
@@ -1851,6 +1896,59 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             }
         }
 
+    }
+
+    void get_extent_neighbors() {
+        extent_neighbors.resize(max_elements_, std::vector<tableint>(0));
+        for (int cur = 0; cur < max_elements_; cur++) {
+            std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> knns = searchBaseLayer(
+                cur, getDataByInternalId(cur), 0);
+
+            extent_neighbors[cur].reserve(maxM0_);
+            unsigned int *data = get_linklist_at_level(cur, 0);
+            for (int i = 1; i <= *data; i++)
+                extent_neighbors[cur].push_back(data[i]);
+            vector<std::pair<dist_t, tableint> > neighbors;
+            neighbors.reserve(knns.size());
+            while (knns.size()) {
+                neighbors.push_back(knns.top());
+                knns.pop();
+            }
+            reverse(neighbors.begin(), neighbors.end());
+            
+            unordered_set<tableint> exist;
+            exist.insert(cur);
+
+            // get max neighbor dist
+            for (int i = 1; i <= *data; i++) {
+                int n1 = data[i];
+                exist.insert(n1);
+                // cout << "n1 = " << n1 << "\n";
+            }
+            dist_t max_neighbor_dist = 0;
+            for (auto &pr: neighbors) {
+                if (exist.find(pr.second) != exist.end()) {
+                    max_neighbor_dist = max(max_neighbor_dist, pr.first);
+                }
+            }
+            for (int i = 1; i <= *data; i++) {
+                int n1 = data[i];
+                unsigned int *data_n1 = get_linklist_at_level(n1, 0);
+                for (int j = 1; j <= *data_n1; j++) {
+                    exist.insert(data_n1[j]);
+                }
+            }
+            // cout << "\n";
+
+
+            for (auto &pr: neighbors) {
+                if (exist.find(pr.second) == exist.end() && pr.first <= 1.5 * max_neighbor_dist) {
+                    // cout << pr.first << " " << pr.second << "\n";
+                    extent_neighbors[cur].push_back(pr.second);
+                }
+                if (extent_neighbors[cur].size() >= maxM0_ * 2) break;
+            }
+        }
     }
 };
 }  // namespace hnswlib

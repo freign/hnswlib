@@ -194,3 +194,10 @@ add_executable(val_kmeans
     ${EXPERIMENT_SOURCES}
 )
 target_link_libraries(val_kmeans hnswlib)
+
+add_executable(val_da 
+    # experiment/k_means.cpp
+    tests/val_degree_adjustment.cpp
+    ${EXPERIMENT_SOURCES}
+)
+target_link_libraries(val_da hnswlib)

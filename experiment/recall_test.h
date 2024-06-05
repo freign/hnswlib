@@ -120,7 +120,7 @@ void test_vs_recall(
     global_config = config;
 
     for (size_t ef: efs) {
-        // if (ef != 60) continue;
+        // if (ef != 220) continue;
         // cout << "ef = " << ef << "\n";
 
         config->high_level_dist_calc = 0;

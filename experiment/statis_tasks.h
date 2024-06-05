@@ -59,17 +59,17 @@ public:
 
     void test() {
         build_graph();
-        alg_hnsw->get_extent_neighbors();
-        config->statis_recursive_len = 1;
+        config->statis_recursive_len = 0;
         config->use_dir_vector = 0;
-        config->statis_ep_dis = 1;
-        config->statis_ep_nn_pair = 1;
+        config->statis_ep_dis = 0;
+        config->statis_ep_nn_pair = 0;
         config->high_level_dist_calc = 0;
-        config->test_nn_path_len = 1;
-        config->use_extent_neighbor = 0;
+        config->test_nn_path_len = 0;
+        config->use_extent_neighbor = 1;
         
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
+            alg_hnsw->get_extent_neighbors();
         }
         if (config->use_dir_vector) {
             cout << "use dir vector\n";

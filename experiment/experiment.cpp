@@ -9,6 +9,7 @@
 #include "statis_tasks.h"
 #include "dir_vector.h"
 #include "k_means.h"
+#include "pq_dist.h"
 
 using namespace std;
 using DATALOADER::DataLoader;
@@ -19,6 +20,7 @@ template<typename dist_t>
 void begin_tst(Tester<dist_t> *rt, Config *config) {
     config->test_enter_point_dis = 1;
     rt->test();
+    // rt->test_faiss();
     // rt->test_waste_cands();
     // rt->test_used_neighbor_dist();
     // rt->test_dir_vector();
@@ -34,7 +36,6 @@ void begin_tst(Tester<dist_t> *rt, Config *config) {
 
 
 int main(int argc, char *argv[]) {
-
     CommandLineOptions opt = ArgParser(argc, argv);
     int max_elements = opt.maxElements;
 

@@ -1,3 +1,6 @@
+#ifndef PQ_DIST_H
+#define PQ_DIST_H
+
 #include <faiss/IndexPQ.h>
 #include <faiss/Index.h>
 #include <faiss/MetricType.h>
@@ -6,6 +9,8 @@
 #include <cstdlib>  // For rand() and srand()
 #include <ctime>    // For time()
 #include <bits/stdc++.h>
+#include "../hnswlib/hnswlib.h"
+#include "dir_vector.h"
 
 class PQDist {
 public:
@@ -17,7 +22,10 @@ public:
     int code_nums;
     int d_pq;
     std::vector<uint8_t> codes;
+    std::vector<float> centroids;
     std::unique_ptr<faiss::IndexPQ> indexPQ;
+    std::unique_ptr<hnswlib::SpaceInterface<float> > space;
+
     void train(int N, std::vector<float> &xb);
 
     std::vector<int> get_centroids_id(int id);
@@ -32,6 +40,10 @@ public:
 
     std::vector<float> qdata;
     bool use_cache;
-    void load_query_data(float *_qdata, bool _use_cache);
+    void load_query_data(const float *_qdata, bool _use_cache);
     float calc_dist_pq_loaded(int data_id);
+
+    void load(std::string filename);
 };
+
+#endif // !PQ_DIST_H

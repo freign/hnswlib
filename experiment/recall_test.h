@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../hnswlib/hnswlib.h"
+#include "pq_dist.h"
 #include "data_loader.h"
 #include "calc_group_truth.h"
 #include "config.h"
@@ -18,14 +19,17 @@ float test_approx(
     hnswlib::HierarchicalNSW<dist_t> *appr_alg,
     size_t K) {
 
+    PQDist a;
+    
     size_t qsize = query_data_loader->get_elements();
     
     double recall = 0;
     int lst_tot_calc = 0;
 
     for (int i = 0; i < qsize; i++) {
-        // if (i != 53) continue;
-
+        if (global_config->use_PQ) {
+            appr_alg->pq_dist->load_query_data(reinterpret_cast<const float*>(query_data_loader->point_data(i)), 1);
+        }
         dist_t nn_dist;
         dist_t nn_node;
         // {

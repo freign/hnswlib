@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../experiment/pq_dist.h"
 #include "visited_list_pool.h"
 #include "../experiment/config.h"
 #include "../experiment/dir_vector.h"
@@ -12,6 +13,7 @@
 #include <list>
 #include <memory>
 
+class PQDist;
 namespace hnswlib {
 typedef unsigned int tableint;
 typedef unsigned int linklistsizeint;
@@ -32,7 +34,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     size_t maxM0_{0};
     size_t ef_construction_{0};
     size_t ef_{ 0 };
-
     double mult_{0.0}, revSize_{0.0};
     int maxlevel_{0};
 
@@ -81,10 +82,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     int reverse_edge_limit;
     std::vector<std::vector<dist_t> > neighbor_dist;
     std::vector<std::vector<tableint> > neighbors_adjust;
-
+    
+    std::unique_ptr<PQDist> pq_dist;
+    
     // 不使用启发式选择
     std::vector<std::vector<tableint> > extent_neighbors;
-
+    // std::unique_ptr<PQDist> pq_dist;
+    // PQDist pq_dist;
     HierarchicalNSW(SpaceInterface<dist_t> *s) {
     }
 
@@ -331,9 +335,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         size_t ef,
         BaseFilterFunctor* isIdAllowed = nullptr,
         BaseSearchStopCondition<dist_t>* stop_condition = nullptr) const {
-        
-        StopW search_timer;
-
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
         vl_type visited_array_tag = vl->curV;
@@ -342,10 +343,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> candidate_set;
 
         dist_t lowerBound;
-        dist_t lowerBoundSqrt;
         if (bare_bone_search || 
             (!isMarkedDeleted(ep_id) && ((!isIdAllowed) || (*isIdAllowed)(getExternalLabel(ep_id))))) {
-
             char* ep_data = getDataByInternalId(ep_id);
             dist_t dist = fstdistfunc_(data_point, ep_data, dist_func_param_);
             lowerBound = dist;
@@ -354,33 +353,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 stop_condition->add_point_to_result(getExternalLabel(ep_id), ep_data, dist);
             }
             candidate_set.emplace(-dist, ep_id);
-
-            if (config->use_multiple_ep) {
-                auto &eps = config->eps;
-                if (eps.size() > 1) {
-                    eps.pop();
-                    while (eps.size()) {
-                        candidate_set.emplace(-eps.top().first, eps.top().second);
-                        eps.pop();
-                    }
-                }
-                // std::cout << "add " << candidate_set.size() << "\n";
-            }
-
-            if (config->test_ep_with_calc) {
-                if (dist <= config->ep_dist_limit) {
-                    config->ep_is_in_limit = 1;
-                    config->ep_in_limit_cnt++;
-                } else config->ep_is_in_limit = 0;
-            }
-
-            // config 
-            config->search_knn_times ++ ;
-            // config ep dist
-            if (config->test_enter_point_dis) {
-                config->ep_dis_tot += dist;
-            }
-
         } else {
             lowerBound = std::numeric_limits<dist_t>::max();
             candidate_set.emplace(-lowerBound, ep_id);
@@ -388,49 +360,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_array[ep_id] = visited_array_tag;
 
-        float ep_dist, nn_dist = 1e9;
-        ep_dist = lowerBound;
-
-        // dir vector prediction
-        StopW timer;
-        int dim = dir_vector::Dir_Vector::dim;
-        dir_vector::Dir_Vector dvq(1);
-        std::vector<uint32_t> mask;
-        dir_vector::Dir_Vector* dv;
-        float avg_pred_dist;
-        int tot_pred_nodes;
-        static std::vector<std::pair<int, int> > pred_dists(maxM0_ * 2);
-
-        if (config->statis_wasted_cand) {
-            config->tot_cand_nodes += candidate_set.size();
-        }
-
-
-        int local_tot_calc = 0;
-        static int calc_avoid = 0;
-        static int cands_num = 0;
-        static int wrong_throw = 0;
-        if (config->statis_ep_dis) {
-            config->ep_dist.push_back(-candidate_set.top().first);
-        }
-
-        // clear
         bool begin_recursive = 0;
-        int step_after_recursive = 0;
         int active_neighbor_num = 0;
         bool find_nearer = 0;
-        if (config->statis_recursive_len) {
-            config->recursive_len = 0;
-        }
-        
-        config->nn_path_len = 0;
-        config->find_nn = 0;
-
-        lowerBoundSqrt = sqrt(lowerBound);
-
         int hop = 0;
 
         while (!candidate_set.empty()) {
+
             hop++;
             if (config->statis_recursive_len && !begin_recursive) {
                 config->recursive_len++;
@@ -438,18 +374,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             if (config->test_nn_path_len && !config->find_nn) {
                 config->nn_path_len++;
             }
+
             std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
             dist_t candidate_dist = -current_node_pair.first;
-            dist_t candidate_dist_sqrt = sqrt(candidate_dist);
-
-            if (config->test_nn_path_len && fabs(sqrt(candidate_dist) - config->nn_dist) < 1e-7) {
-                config->find_nn = 1;
-                config->dist_calc_when_nn = local_tot_calc;
-            }
-            
-            
-
-            nn_dist = min(nn_dist, (float)candidate_dist);
 
             bool flag_stop_search;
             if (bare_bone_search) {
@@ -464,88 +391,15 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             if (flag_stop_search) {
                 break;
             }
-            cands_num ++ ;
             candidate_set.pop();
 
             tableint current_node_id = current_node_pair.second;
-
-            if (config->statis_used_neighbor_dist) {
-                config->used_points_id.insert(current_node_id);
-                config->used_points.push_back(current_node_id);
-            }
-
             int *data = (int *) get_linklist0(current_node_id);
             size_t size = getListCount((linklistsizeint*)data);
 //                bool cur_node_deleted = isMarkedDeleted(current_node_id);
             if (collect_metrics) {
                 metric_hops++;
                 metric_distance_computations+=size;
-            }
-
-
-            if (config->use_dir_vector) {
-
-                using namespace std;
-                
-                if (is_same<dist_t, float>::value) {
-                    dvq.calc_dir_vector_int8(getDataByInternalId(current_node_id), data_point, 0);
-                    mask = dvq.get_mask_int8(data_point, getDataByInternalId(current_node_id));
-                    dv = (*dir_vectors_ptr)[current_node_id];
-                } else {
-                    dvq.calc_dir_vector_float(getDataByInternalId(current_node_id), data_point, 0);
-                    mask = dvq.get_mask_float(data_point, getDataByInternalId(current_node_id));
-                    dv = (*dir_vectors_ptr)[current_node_id];
-                    
-                }
-            }
-
-            
-
-            if (config->use_dir_vector) {
-                
-                avg_pred_dist = 0;
-                tot_pred_nodes = 0;
-                
-                uint32_t *dir_data0 = dvq.dir_vector_data(0);
-                uint32_t *dir_data_neighbors = dv->dir_vector_data(0);
-                uint32_t *mask_data = mask.data();
-                int vector_len = dvq.vector_len;
-
-                _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
-                _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
-                _mm_prefetch((char *) (dir_data_neighbors), _MM_HINT_T0);
-                _mm_prefetch((char *) (dir_data_neighbors + 2), _MM_HINT_T0);
-
-                for (size_t j = 1; j <= size; j++) {
-                    int candidate_id = *(data + j);
-                    int pred_dist;
-                    if (!(visited_array[candidate_id] == visited_array_tag)) {
-                        pred_dist = dvq.calc_dis_with_mask(dir_data0, dir_data_neighbors, mask_data);
-                        avg_pred_dist += pred_dist;
-                        tot_pred_nodes++;
-                    } else pred_dist = dim * 2;
-                    dir_data_neighbors += vector_len;
-                    pred_dists[j] = std::make_pair(pred_dist, j);
-                }
-                avg_pred_dist /= tot_pred_nodes;
-            } else {
-            }
-            // std::cout << "---------------------\n";
-
-
-            if (config->use_reverse_edges) {
-                cout << __LINE__ << "\n";
-                exit(-1);
-                data = reinterpret_cast<int*>((void*)reverse_edges[current_node_id].data()) - 1;
-                size = reverse_edges[current_node_id].size();
-                if (size == 0) continue;
-            }
-
-            if (config->use_degree_adjust) {
-                cout << __LINE__ << "\n";
-                exit(-1);
-                data = reinterpret_cast<int*>((void*)neighbors_adjust[current_node_id].data()) - 1;
-                size = neighbors_adjust[current_node_id].size();
             }
 
             if (config->use_extent_neighbor) {
@@ -558,8 +412,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 }
             }
 
-            // data = reinterpret_cast<int*>((void*)neighbors[current_node_id].data()) - 1;
-            // size = neighbors[current_node_id].size();
             if (size == 0) continue;
 
 #ifdef USE_SSE
@@ -571,64 +423,31 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
             
 
-            int neighbor_couter = 0;
-
-            // 找到了更近的邻居
-            bool find_nearer = 0;
-
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
-
-                // The Triangle Inequality
-                if (neighbor_dist.size() <= current_node_id) {
-                    cout << __FILE__ << " " << __LINE__ << " calc neighbor dist first\n";
-                    exit(0);
-                }
-                if (candidate_set.size() >= ef && lowerBoundSqrt <= candidate_dist_sqrt - neighbor_dist[current_node_id][j-1]) continue;
-
+//                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
                 _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
                 _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
                                 _MM_HINT_T0);  ////////////
 #endif
-            
-
                 if (!(visited_array[candidate_id] == visited_array_tag)) {
                     visited_array[candidate_id] = visited_array_tag;
 
-
-                    if (config->use_dir_vector) {
-                        if (pred_dists[j].first > avg_pred_dist * 1.5) {
-                            calc_avoid ++ ;
-                            config->disc_calc_avoided ++;
-                            continue;
-                        }
-                    }
-
-
                     char *currObj1 = (getDataByInternalId(candidate_id));
-                    dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
+
+                    dist_t dist;
+
+                    if (config->use_PQ) {
+                        dist = pq_dist->calc_dist_pq_loaded(candidate_id);
+                    } else {
+                        dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                    }
+
+
+
+
                     if (dist < candidate_dist) find_nearer = 1;
-
-                    config->tot_dist_calc ++ ;
-                    local_tot_calc++;
-
-                    if (config->statis_wasted_cand) {
-                        config->tot_calculated_nodes++;
-                    }
-
-                    if (config->statis_used_neighbor_dist) {
-                        if (config->all_points.find(candidate_id) != config->all_points.end()) {
-                            std::cout << __FILE__ << " " << __LINE__ << "\n";
-                        }
-                        config->all_points.insert(candidate_id);
-                    }
-
-                    if (config->test_ep_with_calc) {
-                        if (config->ep_is_in_limit) {
-                            config->ep_tot_dis_calc++;
-                        }
-                    }
 
                     bool flag_consider_candidate;
                     if (!bare_bone_search && stop_condition) {
@@ -638,15 +457,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     }
 
                     if (flag_consider_candidate) {
-
-                        
-
                         candidate_set.emplace(-dist, candidate_id);
-
-                        if (config->statis_wasted_cand) {
-                            config->tot_cand_nodes++;
-                        }
-
 #ifdef USE_SSE
                         _mm_prefetch(data_level0_memory_ + candidate_set.top().second * size_data_per_element_ +
                                         offsetLevel0_,  ///////////
@@ -678,14 +489,11 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                             }
                         }
 
-                        if (!top_candidates.empty()) {
+                        if (!top_candidates.empty())
                             lowerBound = top_candidates.top().first;
-                            lowerBoundSqrt = sqrt(lowerBound);
-                        }
                     }
                 }
             }
-
             if (!find_nearer && config->statis_recursive_len && !begin_recursive) {
                 // cout << __LINE__ << "begin recursive " << current_node_id << " now dist = " << sqrt(candidate_dist) << "\n";
                 begin_recursive = 1;
@@ -700,17 +508,22 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     active_neighbor_num = min(active_neighbor_num, 5);
                 }
             }
-            // exit(0);
         }
-        // std::cout << "cands num " << cands_num << " tot calc " << tot_calc << " calc avoid " << calc_avoid << " wrong throw " << wrong_throw << '\n';
-        if (config->statis_wasted_cand) {
-            // sum reset candidates
-            config->wasted_cand_nodes += candidate_set.size();
-        }
+
         visited_list_pool_->releaseVisitedList(vl);
 
-        if (config->statis_ep_nn_pair) {
-            config->ep_nn_pair.push_back(make_pair(ep_dist, nn_dist));
+        if (config->use_PQ) {
+            std::vector<int> candidates;
+            candidates.reserve(top_candidates.size());
+            while (top_candidates.size()) {
+                candidates.push_back(top_candidates.top().second);
+                top_candidates.pop();
+            }
+            for (auto candidate_id: candidates) {
+                char *currObj1 = (getDataByInternalId(candidate_id));
+                dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                top_candidates.emplace(dist, candidate_id);
+            }
         }
 
         return top_candidates;
@@ -1651,34 +1464,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 }
             }
         }
-
-        // } else if (1) {
-        //     int cnt = 0;
-        //     std::queue<int> q;
-        //     std::unordered_set<int> exist;
-        //     q.push(currObj);
-        //     exist.insert(currObj);
-        //     while (!q.empty()) {
-        //         int cur = q.front();
-        //         cnt ++ ;
-        //         q.pop();
-        //         unsigned int *data;
-        //         data = (unsigned int *) get_linklist(cur, 1);
-        //         int size = getListCount(data);
-        //         tableint *datal = (tableint *) (data + 1);
-        //         for (int i = 0; i < size; i++) {
-        //             tableint cand = datal[i];
-        //             if (exist.find(cand) != exist.end()) continue;
-        //             exist.insert(cand);
-        //             q.push(cand);
-        //             dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
-        //             if (d < curdist) {
-        //                 curdist = d;
-        //                 currObj = cand;
-        //             }
-        //         }
-        //     }
-        // }
 
         if (config->use_multiple_ep) {
             while (config->eps.size()) {

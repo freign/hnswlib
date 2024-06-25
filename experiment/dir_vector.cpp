@@ -217,3 +217,7 @@ std::vector<uint32_t> Dir_Vector::get_mask_float(const void *data1, const void *
 }
 
 } // namespace dir_vector
+
+void temfunc() {
+    
+}

@@ -2,12 +2,12 @@
 
 #include <bits/stdc++.h>
 #include "timer.h"
+#include "pq_dist.h"
 using namespace std;
 
 struct Config {
 
     int search_knn_times = 0;
-
     bool statis_wasted_cand = 0;
     uint64_t tot_cand_nodes;
     uint64_t wasted_cand_nodes;
@@ -81,5 +81,8 @@ struct Config {
     int dist_calc_when_nn = 0;
 
     bool use_extent_neighbor = 0;
+
+    bool use_PQ = 0;
+    // PQDist tem;
 };
 

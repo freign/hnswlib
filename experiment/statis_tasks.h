@@ -1,6 +1,11 @@
 #pragma once
 #include <bits/stdc++.h>
 
+#include <faiss/IndexHNSW.h>
+#include <faiss/IndexPQ.h>
+// #include <faiss/IndexHNSWPQ.h>
+#include <faiss/index_io.h>
+
 #include "data_loader.h"
 
 #include "../hnswlib/hnswlib.h"
@@ -65,8 +70,8 @@ public:
         config->statis_ep_nn_pair = 0;
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
-        config->use_extent_neighbor = 1;
-        
+        config->use_extent_neighbor = 0;
+        config->use_PQ = 1;
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
             alg_hnsw->get_extent_neighbors();
@@ -76,7 +81,36 @@ public:
             calc_dir_vector();
             alg_hnsw->dir_vectors_ptr = &dir_vectors;
         }
+        if (config->use_PQ) {
+            cout << "use PQ to calculate dist\n";
 
+            // load from file
+            string pq_file = "../PQ/pq_" + to_string(data_loader->get_elements()) + ".txt";
+
+            int d = 960;
+            int m = 120;
+            int nbits = 8;
+
+            alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
+            alg_hnsw->pq_dist->load(pq_file);
+
+            // int d = 960;
+            // // Number of vectors to index
+            // int N = data_loader->get_elements();
+            // // Number of subquantizers
+            // int m = 40;
+            // // Number of bits per subquantizer
+            // int nbits = 8;
+            // alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
+
+            // {
+            //     std::vector<float> xb(N * d * sizeof(float));
+            //     for (int i = 0; i < N; i++) {
+            //         memcpy(xb.data() + (i * d * sizeof(float)), data_loader->point_data(i), d * sizeof(float));
+            //     }
+            //     alg_hnsw->pq_dist->train(N, xb);
+            // }
+        }
         config->test_ep_with_calc = 1;
         config->ep_dist_limit = 0.4;
 
@@ -143,6 +177,8 @@ public:
     void test_multi_ep();
 
     void test_ep_dist_calc();
+
+    void test_faiss();
 private:
     string data_dir;
     string data_path;
@@ -412,4 +448,57 @@ void Tester<dist_t>::test_ep_dist_calc() {
     }
 
 
+}
+
+template<typename dist_t>
+void Tester<dist_t>::test_faiss() {
+    int N = data_loader->get_elements();
+    int d = 960;
+    int M = 32; // HNSW中的邻居数量
+    faiss::IndexHNSWFlat hnsw_index(d, M);
+    hnsw_index.hnsw.efConstruction = 200; // 构建时的ef参数
+
+    int M_pq = 4; // 每个子向量的字典大小
+    faiss::IndexHNSWPQ hnswpq_index(d, M, d / M_pq, 8);
+    hnswpq_index.hnsw.efConstruction = 200; // 构建时的ef参数
+    
+    // for (int i = 0; i < 10; i++) {
+    //     auto gt = gt_loader->get_knn_gt(i);
+    //     for (int j = 0; j < 10; j++)
+    //         cout << gt[j] << ' ' << ' ' << space->get_dist_func()(data_loader->point_data(gt[j]), query_data_loader->point_data(i), space->get_dist_func_param()) << "\n";
+    //     cout << "\n";
+    // }
+    // exit(0);
+
+    {
+        vector<float> points(N * d * 4);
+        for (int i = 0 ; i < N; i++) {
+            memcpy(points.data() + i * d * 4, data_loader->point_data(i), d*4);
+        }
+        hnsw_index.add(N, points.data());
+        // hnswpq_index.train(N, points.data());
+        // hnswpq_index.add(N, points.data());
+    }
+
+    int k = 10;
+    for (int ef = 20; ef <= 100; ef += 10) {
+        hnsw_index.hnsw.efSearch = ef;
+
+        vector<int64_t> labels(k);
+        vector<float> query(d);
+        vector<float> distances(k);
+
+        double recall = 0;
+        for (int i = 0; i < query_data_loader->get_elements(); i++) {
+            hnsw_index.search(1, reinterpret_cast<const float*>(query_data_loader->point_data(i)), k, distances.data(), labels.data());
+
+            vector<uint32_t> knn;
+            for (auto l: labels) knn.push_back((uint32_t)l);
+            recall += gt_loader->calc_recall(knn, i, k);
+            // for (int j = 0; j < k; j++)
+            //     cout << labels[j] << ' ' << distances[j] << '\n';
+        }
+        recall /= query_data_loader->get_elements();
+        cout << "ef = " << ef << " recall = " << recall << "\n";
+    }
 }

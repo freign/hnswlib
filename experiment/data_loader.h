@@ -2,7 +2,7 @@
 
 #include <bits/stdc++.h>
 #include "../hnswlib/hnswlib.h"
-
+#include "pq_dist.h"
 namespace DATALOADER {
 class DataLoader {
 

@@ -172,32 +172,81 @@ message(${CMAKE_CXX_FLAGS})
 # SET( CMAKE_CXX_FLAGS  "-g -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
 
 set(EXPERIMENT_SOURCES
+    experiment/pq_dist.cpp
     experiment/data_loader.cpp
     experiment/ArgParser.cpp
     experiment/dir_vector.cpp
     # experiment/k_means.cpp
 )
 
+# 包含必要的头文件目录
+include_directories(/usr/local/include)
 include_directories(${CMAKE_SOURCE_DIR}/hnswlib)
-# include_directories(${CMAKE_SOURCE_DIR}/kmeans)
 include_directories(${CMAKE_SOURCE_DIR}/experiment)
+
+# 查找OpenMP包
+find_package(OpenMP REQUIRED)
+# 查找BLAS和LAPACK库
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+# 查找Faiss库
+find_path(FAISS_INCLUDE_DIR faiss/Index.h)
+find_library(FAISS_LIBRARY faiss)
+
+if (NOT FAISS_INCLUDE_DIR OR NOT FAISS_LIBRARY)
+    message(FATAL_ERROR "Faiss library not found")
+endif()
+
+include_directories(${FAISS_INCLUDE_DIR})
 
 add_executable(experiment 
     experiment/experiment.cpp
     ${EXPERIMENT_SOURCES}
 )
-target_link_libraries(experiment hnswlib)
-    
+target_link_libraries(experiment
+    OpenMP::OpenMP_CXX
+    ${FAISS_LIBRARY}
+    ${BLAS_LIBRARIES}
+    ${LAPACK_LIBRARIES}
+    hnswlib
+)
+
 add_executable(val_kmeans 
     # experiment/k_means.cpp
     tests/val_kmeans.cpp
     ${EXPERIMENT_SOURCES}
 )
-target_link_libraries(val_kmeans hnswlib)
+target_link_libraries(val_kmeans
+    OpenMP::OpenMP_CXX
+    ${FAISS_LIBRARY}
+    ${BLAS_LIBRARIES}
+    ${LAPACK_LIBRARIES}
+    hnswlib
+)
 
 add_executable(val_da 
     # experiment/k_means.cpp
     tests/val_degree_adjustment.cpp
     ${EXPERIMENT_SOURCES}
 )
-target_link_libraries(val_da hnswlib)
+target_link_libraries(val_da
+    OpenMP::OpenMP_CXX
+    ${FAISS_LIBRARY}
+    ${BLAS_LIBRARIES}
+    ${LAPACK_LIBRARIES}
+    hnswlib
+)
+
+add_executable(val_pq
+    # experiment/k_means.cpp
+    tests/val_PQ.cpp
+    ${EXPERIMENT_SOURCES}
+)
+# 链接OpenMP库，BLAS库，LAPACK库
+target_link_libraries(val_pq
+    OpenMP::OpenMP_CXX
+    ${FAISS_LIBRARY}
+    ${BLAS_LIBRARIES}
+    ${LAPACK_LIBRARIES}
+    hnswlib
+)

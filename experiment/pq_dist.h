@@ -11,7 +11,7 @@
 #include <bits/stdc++.h>
 #include "../hnswlib/hnswlib.h"
 #include "dir_vector.h"
-
+using namespace std;
 class PQDist {
 public:
     PQDist() = default;
@@ -28,7 +28,7 @@ public:
 
     void train(int N, std::vector<float> &xb);
 
-    std::vector<int> get_centroids_id(int id);
+    std::vector<uint8_t> get_centroids_id(int id);
     float* get_centroid_data(int quantizer, int code_id);
 
     float calc_dist(int d, float *vec1, float *vec2);
@@ -41,9 +41,19 @@ public:
     std::vector<float> qdata;
     bool use_cache;
     void load_query_data(const float *_qdata, bool _use_cache);
+    void load_query_data_and_cache(const float *_qdata) ;
+    float calc_dist_pq_(int data_id, float *qdata, bool use_cache);
     float calc_dist_pq_loaded(int data_id);
-
+    float calc_dist_pq_loaded_(int data_id);
     void load(std::string filename);
+    vector<int> encode_query(float* query);
+    vector<vector<vector<float>>> distance_table;
+    void construct_distance_table();
+    float calc_dist_pq_from_table(int data_id, vector<int>& qids);
+    float calc_dist_pq_simd(int data_id, float *qdata, bool use_cache);
+    float calc_dist_pq_loaded_simd(int data_id);
+    
+    float *pq_dist_cache_data;
 };
 
 #endif // !PQ_DIST_H

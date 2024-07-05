@@ -84,5 +84,6 @@ struct Config {
 
     bool use_PQ = 0;
     // PQDist tem;
+    vector<vector<int> > point_search;
 };
 

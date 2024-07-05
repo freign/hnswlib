@@ -71,7 +71,7 @@ public:
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
         config->use_extent_neighbor = 0;
-        config->use_PQ = 1;
+        config->use_PQ = 0;
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
             alg_hnsw->get_extent_neighbors();
@@ -129,6 +129,12 @@ public:
         cout << "query elements: " << query_data_loader->get_elements() << "\n";
         cout << "max level = " << config->max_level << "\n";
         cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
+
+        // ofstream point_search_file("../point_search.txt");
+        // for (auto &points: config->point_search) {
+        //     for (auto p: points) point_search_file << p << " ";
+        //     point_search_file << "\n";
+        // }
     }
 
     void build_graph() {

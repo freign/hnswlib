@@ -365,6 +365,10 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         bool find_nearer = 0;
         int hop = 0;
 
+        // {
+        //     config->point_search.push_back(std::vector<int>());
+        // }
+
         while (!candidate_set.empty()) {
 
             hop++;
@@ -444,6 +448,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                         dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
                     }
 
+                    // {
+                    //     config->point_search.back().push_back(candidate_id);
+                    // }
 
 
 

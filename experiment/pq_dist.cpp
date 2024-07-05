@@ -119,7 +119,7 @@ void PQDist::load(string filename) {
 
     pq_dist_cache.resize(m * code_nums);
 
-    codes.resize(N * m * nbits / 8);
+    codes.resize((size_t)N * m * nbits / 8);
     
     fin.read(reinterpret_cast<char*>(codes.data()), codes.size());
 

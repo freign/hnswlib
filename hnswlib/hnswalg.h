@@ -442,8 +442,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
                     dist_t dist;
 
+                    config->tot_dist_calc++;
                     if (config->use_PQ) {
-                        dist = pq_dist->calc_dist_pq_loaded(candidate_id);
+                        dist = pq_dist->calc_dist_pq_loaded_simd(candidate_id);
                     } else {
                         dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
                     }

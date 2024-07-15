@@ -51,6 +51,7 @@ public:
     void construct_distance_table();
     float calc_dist_pq_from_table(int data_id, vector<int>& qids);
     float calc_dist_pq_simd(int data_id, float *qdata, bool use_cache);
+    float calc_dist_pq_simd(int data_id, uint8_t* centroids);
     float calc_dist_pq_loaded_simd(int data_id);
     
     float *pq_dist_cache_data;

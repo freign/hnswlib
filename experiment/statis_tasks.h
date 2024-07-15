@@ -63,6 +63,7 @@ public:
     }
 
     void test() {
+
         build_graph();
         config->statis_recursive_len = 0;
         config->use_dir_vector = 0;
@@ -71,7 +72,7 @@ public:
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
         config->use_extent_neighbor = 0;
-        config->use_PQ = 0;
+        config->use_PQ = 1;
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
             alg_hnsw->get_extent_neighbors();
@@ -84,32 +85,21 @@ public:
         if (config->use_PQ) {
             cout << "use PQ to calculate dist\n";
 
-            // load from file
-            string pq_file = "../PQ/pq_" + to_string(data_loader->get_elements()) + ".txt";
 
             int d = 960;
-            int m = 120;
-            int nbits = 8;
+            int m = 240;
+            int nbits = 4;
 
+            // load from file
+            string pq_dir = "/share/ann_benchmarks/gist/";
+            string pq_file = pq_dir + "encoded_data_100000_" + to_string(m) + "_" + to_string(nbits);
+            // string pq_file = "../PQ/pq_" + to_string(data_loader->get_elements()) + ".txt";
             alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
             alg_hnsw->pq_dist->load(pq_file);
 
-            // int d = 960;
-            // // Number of vectors to index
-            // int N = data_loader->get_elements();
-            // // Number of subquantizers
-            // int m = 40;
-            // // Number of bits per subquantizer
-            // int nbits = 8;
-            // alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
-
-            // {
-            //     std::vector<float> xb(N * d * sizeof(float));
-            //     for (int i = 0; i < N; i++) {
-            //         memcpy(xb.data() + (i * d * sizeof(float)), data_loader->point_data(i), d * sizeof(float));
-            //     }
-            //     alg_hnsw->pq_dist->train(N, xb);
-            // }
+            // alg_hnsw->pq_dist->extract_centroid_ids(alg_hnsw->max_elements_);
+            // alg_hnsw->extract_neigbor_centroids();
+            // std::cout << "PQ ready" << std::endl;
         }
         config->test_ep_with_calc = 1;
         config->ep_dist_limit = 0.4;

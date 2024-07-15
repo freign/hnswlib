@@ -28,32 +28,11 @@ float test_approx(
 
     for (int i = 0; i < qsize; i++) {
         if (global_config->use_PQ) {
-            appr_alg->pq_dist->load_query_data(reinterpret_cast<const float*>(query_data_loader->point_data(i)), 1);
+            // appr_alg->pq_dist->load_query_data(reinterpret_cast<const float*>(query_data_loader->point_data(i)), 1);
+            appr_alg->pq_dist->load_query_data_and_cache(reinterpret_cast<const float*>(query_data_loader->point_data(i)));
         }
         dist_t nn_dist;
         dist_t nn_node;
-        // {
-        //     hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(query_data_loader->get_dim());
-        //     appr_alg->setEf(200);
-        //     auto result = appr_alg->searchKnn(query_data_loader->point_data(i), K);
-        //     vector<int> nns;
-        //     while (result.size()) {
-        //         nn_dist = result.top().first;
-        //         nn_node = result.top().second;
-        //         // cout << "gt 10 " << nn_node << " " << nn_dist << "\n";
-        //         nns.push_back(nn_node);
-        //         result.pop();
-        //     }
-        //     // for (int j = 0; j < 10; j++) {
-        //     //     for (int k = 0; k < 10; k++) {
-        //     //         float d = space->get_dist_func()(data_loader->point_data(nns[j]), data_loader->point_data(nns[k]), space->get_dist_func_param());
-        //     //         cout << d << " ";
-        //     //     }
-        //     //     cout << "\n";
-        //     // }
-        //     nn_dist = sqrt(nn_dist);
-        //     // appr_alg->print_neighbor0(nn_node);
-        // }
 
         global_config->nn_dist = nn_dist;
 

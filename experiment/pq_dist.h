@@ -15,7 +15,7 @@ using namespace std;
 class PQDist {
 public:
     PQDist() = default;
-    ~PQDist() = default;
+    ~PQDist();
 
     PQDist(int _d, int _m, int _nbits);
     int d, m, nbits;
@@ -51,10 +51,16 @@ public:
     void construct_distance_table();
     float calc_dist_pq_from_table(int data_id, vector<int>& qids);
     float calc_dist_pq_simd(int data_id, float *qdata, bool use_cache);
-    float calc_dist_pq_simd(int data_id, uint8_t* centroids);
     float calc_dist_pq_loaded_simd(int data_id);
-    
+    float calc_dist_pq_loaded_simd(int data_id, const uint8_t* ids);
+    float calc_dist_pq_loaded_simd_scale(int data_id);
+
     float *pq_dist_cache_data;
+
+
+    vector<uint8_t> centroid_ids;
+    void extract_centroid_ids(int n);
+    void extract_neighbor_centroid_ids(vector<uint8_t> &result, int *neighbor, int size);
 };
 
 #endif // !PQ_DIST_H

@@ -2,6 +2,7 @@
 #include <cstring>
 #include <memory>
 #include <immintrin.h>
+#include <emmintrin.h>
 
 using namespace std;
 
@@ -20,6 +21,9 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
 
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
 
+}
+
+PQDist::~PQDist() {
 }
 
 void PQDist::train(int N, std::vector<float> &xb) {
@@ -102,7 +106,7 @@ float* PQDist::get_centroid_data(int quantizer, int code_id) {
     return centroids.data() + (quantizer*code_nums + code_id) * d_pq;
 }
 
-float PQDist::calc_dist(int d, float *vec1, float *vec2) {
+inline float PQDist::calc_dist(int d, float *vec1, float *vec2) {
     assert(d == *reinterpret_cast<int*>(space->get_dist_func_param()));
     return space->get_dist_func()(vec1, vec2, space->get_dist_func_param());
 }
@@ -140,16 +144,31 @@ void PQDist::load_query_data_and_cache(const float *_qdata) {
     memcpy(qdata.data(), _qdata, sizeof(float) * d);
     clear_pq_dist_cache();
     use_cache = true;
+
+
+    float maxx = -1e9, minn = 1e9;
     for(int i = 0; i < m * code_nums; i++) {
         pq_dist_cache[i] = calc_dist(d_pq, get_centroid_data(i / code_nums, i % code_nums), qdata.data() + (i / code_nums) * d_pq);
+
+        // maxx = max(maxx, pq_dist_cache[i]);
+        // minn = min(minn, pq_dist_cache[i]);
     }
+
+    // this->offset = minn;
+    // this->scale = (maxx - minn) / 255.0;
+    // for(int i = 0; i < m * code_nums; i++) {
+    //     pq_dist_cache_data_ui8[i] = std::round((pq_dist_cache[i] - offset) / scale);
+    // }
+
     pq_dist_cache_data = pq_dist_cache.data();
+
     _mm_prefetch(pq_dist_cache_data, _MM_HINT_NTA);
 
     size_t prefetch_size = 128;
     for (int i = 0; i < pq_dist_cache.size() * 4; i += prefetch_size / 4) {
         _mm_prefetch(pq_dist_cache_data + i, _MM_HINT_NTA);
     }
+
 }
 float PQDist::calc_dist_pq_(int data_id, float *qdata, bool use_cache=true) {
     float dist = 0;
@@ -163,10 +182,11 @@ float PQDist::calc_dist_pq_(int data_id, float *qdata, bool use_cache=true) {
 float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
     float dist = 0;
     std::vector<uint8_t> ids = get_centroids_id(data_id);
-    const uint8_t *code = codes.data() + data_id * (this->m * this->nbits / 8);
     __m256 simd_dist = _mm256_setzero_ps();
     int q;
-    for (q = 0; q <= m - 8; q += 8) {
+    const int stride = 8;
+    
+    for (q = 0; q <= m - stride; q += stride) {
         // 加载8个uint8_t值到128位寄存器
         __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(ids.data() + q));
         // __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(code + q));
@@ -190,12 +210,13 @@ float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
         simd_dist = _mm256_add_ps(simd_dist, dist_vec);
     }
 
-    // 将结果存储到数组中
+    // 使用水平加法累加simd_dist中的值
+    simd_dist = _mm256_hadd_ps(simd_dist, simd_dist);
+    simd_dist = _mm256_hadd_ps(simd_dist, simd_dist);
+
     float dist_array[8];
     _mm256_storeu_ps(dist_array, simd_dist);
-    for (int i = 0; i < 8; ++i) {
-        dist += dist_array[i];
-    }
+    dist += dist_array[0] + dist_array[4];
 
     // 处理剩余的元素
     for (; q < m; q++) {
@@ -206,9 +227,8 @@ float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
     return dist;
 }
 
-float PQDist::calc_dist_pq_simd(int data_id, uint8_t* centroids) {
+float PQDist::calc_dist_pq_loaded_simd(int data_id, const uint8_t* centroids) {
     float dist = 0;
-    const uint8_t *code = codes.data() + data_id * (this->m * this->nbits / 8);
     __m256 simd_dist = _mm256_setzero_ps();
     int q;
     for (q = 0; q <= m - 8; q += 8) {
@@ -252,37 +272,6 @@ float PQDist::calc_dist_pq_simd(int data_id, uint8_t* centroids) {
 }
 
 
-// float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
-//     float dist = 0;
-//     std::vector<int> ids = get_centroids_id(data_id);
-//     __m256 simd_dist = _mm256_setzero_ps();
-//     int q;
-//     for (q = 0; q <= m - 8; q += 8) {
-//         __m256i id_vec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ids.data() + q));
-//         __m256i offset_vec = _mm256_setr_epi32(
-//             0 * code_nums, 1 * code_nums, 2 * code_nums, 3 * code_nums,
-//             4 * code_nums, 5 * code_nums, 6 * code_nums, 7 * code_nums
-//         );
-//         id_vec = _mm256_add_epi32(id_vec, offset_vec);
-
-//         __m256 dist_vec = _mm256_i32gather_ps(pq_dist_cache_data + q * code_nums, id_vec, 4);
-
-//         simd_dist = _mm256_add_ps(simd_dist, dist_vec);
-//     }
-
-//     float dist_array[8];
-//     _mm256_storeu_ps(dist_array, simd_dist);
-//     for (int i = 0; i < 8; ++i) {
-//         dist += dist_array[i];
-//     }
-
-//     for (; q < m; q++) {
-//         dist += pq_dist_cache[q * code_nums + ids[q]];
-//     }
-
-//     return dist;
-// }
-
 float PQDist::calc_dist_pq_loaded(int data_id) {
     return calc_dist_pq(data_id, qdata.data(), use_cache);
 }
@@ -291,6 +280,11 @@ float PQDist::calc_dist_pq_loaded_(int data_id) {
 }
 float PQDist::calc_dist_pq_loaded_simd(int data_id) {
     return calc_dist_pq_simd(data_id, qdata.data(), use_cache);
+}
+
+float PQDist::calc_dist_pq_loaded_simd_scale(int data_id) {
+
+    // return dist * this->scale + this->offset;
 }
 
 void PQDist::load(string filename) {
@@ -358,6 +352,7 @@ vector<int> PQDist::encode_query(float *query) {
     }
     return res;
 }
+
 void PQDist::construct_distance_table() {
     distance_table.resize(m);
     for (int i = 0; i < m; i++) {
@@ -377,4 +372,20 @@ float PQDist::calc_dist_pq_from_table(int data_id, vector<int>& qids) {
         dist += distance_table[q][ids[q]][qids[q]];
     }
     return dist;
+}
+
+void PQDist::extract_centroid_ids(int n) {
+    centroid_ids.resize(n * m);
+    for (int i = 0; i < n; i++) {
+        auto ids = get_centroids_id(i);
+        memcpy(centroid_ids.data() + i*m, ids.data(), m);
+    }
+}
+
+void PQDist::extract_neighbor_centroid_ids(vector<uint8_t> &result, int *neighbors, int size) {
+    result.resize(m * size);
+    for (int i = 0; i < size; i++) {
+        int neighbor = neighbors[i];
+        memcpy(result.data() + i*m, centroid_ids.data() + neighbor*m, m);
+    }
 }

@@ -85,6 +85,17 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     
     std::unique_ptr<PQDist> pq_dist;
     
+    std::vector<std::vector<uint8_t> > neighbor_centroids;
+
+    void extract_neigbor_centroids() {
+        neighbor_centroids.resize(max_elements_ + 1);
+        for (int i = 0; i < max_elements_; i++) {
+            int *data = (int *) get_linklist0(i);
+            size_t size = getListCount((linklistsizeint*)data);
+            pq_dist->extract_neighbor_centroid_ids(neighbor_centroids[i], data+1, size);
+        }
+    }
+
     // 不使用启发式选择
     std::vector<std::vector<tableint> > extent_neighbors;
     // std::unique_ptr<PQDist> pq_dist;
@@ -421,30 +432,43 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 #ifdef USE_SSE
             _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
             _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
-            _mm_prefetch(data_level0_memory_ + (*(data + 1)) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
+
+            if (!config->use_PQ) {
+                _mm_prefetch(data_level0_memory_ + (*(data + 1)) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
+            }
             _mm_prefetch((char *) (data + 2), _MM_HINT_T0);
 #endif
 
-            
+            const uint8_t *neighbors_centroid_ids;
+            if (config->use_PQ) {
+                neighbors_centroid_ids = neighbor_centroids[current_node_id].data();
+                _mm_prefetch((const char *) neighbors_centroid_ids, _MM_HINT_T0);
+                neighbors_centroid_ids -= pq_dist->m;
+            }
 
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
+                neighbors_centroid_ids += pq_dist->m;
+
 //                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
                 _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
-                _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
-                                _MM_HINT_T0);  ////////////
+                
+                if (!config->use_PQ) {
+                    _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
+                                    _MM_HINT_T0);  ////////////
+                }
 #endif
                 if (!(visited_array[candidate_id] == visited_array_tag)) {
                     visited_array[candidate_id] = visited_array_tag;
 
                     char *currObj1 = (getDataByInternalId(candidate_id));
-
                     dist_t dist;
 
                     config->tot_dist_calc++;
                     if (config->use_PQ) {
-                        dist = pq_dist->calc_dist_pq_loaded_simd(candidate_id);
+                        // dist = pq_dist->calc_dist_pq_loaded_simd(candidate_id);
+                        dist = pq_dist->calc_dist_pq_loaded_simd(candidate_id, neighbors_centroid_ids);
                     } else {
                         dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
                     }

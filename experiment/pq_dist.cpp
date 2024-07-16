@@ -227,49 +227,6 @@ float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
     return dist;
 }
 
-float PQDist::calc_dist_pq_loaded_simd(int data_id, const uint8_t* centroids) {
-    float dist = 0;
-    __m256 simd_dist = _mm256_setzero_ps();
-    int q;
-    for (q = 0; q <= m - 8; q += 8) {
-        // 加载8个uint8_t值到128位寄存器
-        __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(centroids + q));
-        // __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(code + q));
-
-        // 扩展为32位整数
-        __m256i id_vec = _mm256_cvtepu8_epi32(id_vec_128);
-
-        // 创建偏移向量
-        __m256i offset_vec = _mm256_setr_epi32(
-            0 * code_nums, 1 * code_nums, 2 * code_nums, 3 * code_nums,
-            4 * code_nums, 5 * code_nums, 6 * code_nums, 7 * code_nums
-        );
-        
-        // 将偏移向量添加到id_vec中
-        id_vec = _mm256_add_epi32(id_vec, offset_vec);
-
-        // 使用gather指令从pq_dist_cache_data中获取距离值
-        __m256 dist_vec = _mm256_i32gather_ps(pq_dist_cache_data + q * code_nums, id_vec, 4);
-
-        // 累加距离值
-        simd_dist = _mm256_add_ps(simd_dist, dist_vec);
-    }
-
-    // 将结果存储到数组中
-    float dist_array[8];
-    _mm256_storeu_ps(dist_array, simd_dist);
-    for (int i = 0; i < 8; ++i) {
-        dist += dist_array[i];
-    }
-
-    // 处理剩余的元素
-    for (; q < m; q++) {
-        dist += pq_dist_cache[q * code_nums + centroids[q]];
-        // dist += pq_dist_cache[q * code_nums + code[q]];
-    }
-
-    return dist;
-}
 
 
 float PQDist::calc_dist_pq_loaded(int data_id) {

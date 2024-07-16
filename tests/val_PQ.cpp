@@ -29,8 +29,14 @@ int main(int argc, char *argv[])
     int nbits = atoi(argv[2]);
     int M = 16;
     int ef_construction = 200;
-    DataLoader *data_loader = new DataLoader("f", 1000000, "../../gist/train.fvecs", "gist");
-    DataLoader *query_data_loader = new DataLoader("f", 1000, "../../gist/test.fvecs", "gist");
+
+    string gist_dir = "/share/ann_benchmarks/gist/";
+
+    DataLoader *data_loader = new DataLoader("f", 1000000, gist_dir + "train.fvecs", "gist");
+    // DataLoader *data_loader = new DataLoader("f", 1000000, "/root/datasets/gist/train.fvecs", "gist");
+    DataLoader *query_data_loader = new DataLoader("f", 1000, gist_dir + "test.fvecs", "gist");
+    
+    
     //GroundTruth::GT_Loader *gt_loader;
 
     //Config *config = new Config();
@@ -65,7 +71,7 @@ int main(int argc, char *argv[])
     //StopW trainTimer;
     PQDist *pq_dist = new PQDist(d, m, nbits);
 
-    string path = "../../python_gist/encoded_data_" + to_string(m) + "_" + to_string(nbits);
+    string path = gist_dir + "encoded_data_" + to_string(m) + "_" + to_string(nbits);
     pq_dist->load(path);
     /* for (int i = 99999; i < 100000; i++)
     {
@@ -78,7 +84,7 @@ int main(int argc, char *argv[])
 
     //hnswlib::SpaceInterface<float> *space2 = new hnswlib::L2Space(data_loader->get_dim() / 2);
 
-    ifstream file("../point_search.txt");
+    ifstream file(gist_dir + "point_search.txt");
     string line;
     vector<vector<int>> points_search(1000);
     int t = 0;
@@ -110,8 +116,9 @@ int main(int argc, char *argv[])
     {
         pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(j)));
     } 
-    cout << "load time " << LoadTimer.getElapsedTimeMicro() / 1e6 << endl;
+    cout << "load time " << LoadTimer.getElapsedTimeMicro() / 1e3 << endl;
 
+    
     StopW PQTimer;
     PQTimer.reset();
     vector<float> pqs;
@@ -121,21 +128,17 @@ int main(int argc, char *argv[])
         for (int i : points_search[j])
         {
             float distPQ = pq_dist->calc_dist_pq_loaded_simd(i);
-            // cout << distPQ << " " << real_dist << "\n";
-            // for (int iter = 0; iter < 2; iter++)
-            //     float real_dist = space2->get_dist_func()(
-            //             query_data_loader->point_data(j), data_loader->point_data(i), space2->get_dist_func_param());
+            // float distPQ = pq_dist->calc_dist_pq_loaded_simd_scale(i);
             pqs.push_back(distPQ);
         }
     }
-    cout << "PQ time " << PQTimer.getElapsedTimeMicro() / 1e6 << endl;
+    cout << "PQ time " << PQTimer.getElapsedTimeMicro() / 1e3 << endl;
 
     StopW RealTimer;
     RealTimer.reset();
     vector<float> reals;
     for (int j = 0; j < query_data_loader->get_elements(); j += 1)
     {
-        pq_dist->load_query_data(reinterpret_cast<const float *>(query_data_loader->point_data(j)), 1);
         for (int i : points_search[j])
         {
             float real_dist = space.get_dist_func()(
@@ -144,7 +147,7 @@ int main(int argc, char *argv[])
             // cout << distPQ << " " << real_dist << "\n";
         }
     }
-    cout << "real time " << RealTimer.getElapsedTimeMicro() / 1e6 << endl;
+    cout << "real time " << RealTimer.getElapsedTimeMicro() / 1e3 << endl;
     assert(pqs.size() == reals.size());
 
     float error = 0;

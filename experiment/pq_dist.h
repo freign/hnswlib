@@ -21,6 +21,7 @@ public:
     int d, m, nbits;
     int code_nums;
     int d_pq;
+    size_t table_size;
     std::vector<uint8_t> codes;
     std::vector<float> centroids;
     std::unique_ptr<faiss::IndexPQ> indexPQ;
@@ -35,7 +36,6 @@ public:
     float calc_dist_pq(int data_id, float *qdata, bool use_cache);
 
 
-    std::vector<float> pq_dist_cache;
     void clear_pq_dist_cache();
 
     std::vector<float> qdata;
@@ -53,9 +53,10 @@ public:
     float calc_dist_pq_simd(int data_id, float *qdata, bool use_cache);
     float calc_dist_pq_loaded_simd(int data_id);
     inline float calc_dist_pq_loaded_simd(int data_id, const uint8_t* ids);
+    inline float calc_dist_pq_loaded(int data_id, const uint8_t* ids);
     float calc_dist_pq_loaded_simd_scale(int data_id);
 
-    float *pq_dist_cache_data;
+    float *pq_dist_cache_data = nullptr;
 
 
     vector<uint8_t> centroid_ids;
@@ -100,10 +101,25 @@ inline float PQDist::calc_dist_pq_loaded_simd(int data_id, const uint8_t* centro
 
     // 处理剩余的元素
     for (; q < m; q++) {
-        dist += pq_dist_cache[q * code_nums + centroids[q]];
+        dist += pq_dist_cache_data[q * code_nums + centroids[q]];
         // dist += pq_dist_cache[q * code_nums + code[q]];
     }
 
+    return dist;
+}
+
+inline float PQDist::calc_dist_pq_loaded(int data_id, const uint8_t* centroids) {
+    const uint8_t *centroid_end = centroids + m;
+    const float *LookUpTable = pq_dist_cache_data;
+    float dist = 0;
+    int idx = 0;
+    // __builtin_prefetch()
+    while (centroids < centroid_end) {
+        dist += LookUpTable[*centroids];
+        // LookUpTable += code_nums;
+        centroids++;
+        // dist += LookUpTable[idx++];
+    }
     return dist;
 }
 

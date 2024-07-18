@@ -10,13 +10,15 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
     indexPQ = std::move(std::make_unique<faiss::IndexPQ>(d, m, nbits));
     code_nums = 1 << nbits;
     d_pq = _d / _m;
+    table_size = m * code_nums;
     if (nbits > 8) {
         cout << "Warning nbits exceeds 8: " << nbits << "\n";
     } else if (8 % nbits != 0) {
         perror("nbits must be divided by 8!");
     }
 
-    pq_dist_cache.resize(m * code_nums);
+    // pq_dist_cache.resize(m * code_nums);
+    pq_dist_cache_data = (float*)aligned_alloc(32, sizeof(float) * table_size);
     qdata.resize(d);
 
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
@@ -24,7 +26,8 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
 }
 
 PQDist::~PQDist() {
-
+    if (pq_dist_cache_data != nullptr)
+        delete []pq_dist_cache_data;
 }
 
 void PQDist::train(int N, std::vector<float> &xb) {
@@ -118,14 +121,14 @@ float PQDist::calc_dist_pq(int data_id, float *qdata, bool use_cache=true) {
     auto ids = get_centroids_id(data_id);
     for (int q = 0; q < m; q++) {
         float d;
-        if (!use_cache || pq_dist_cache[q*code_nums + ids[q]] < eps) {
+        if (!use_cache || pq_dist_cache_data[q*code_nums + ids[q]] < eps) {
             // quantizers
             float *centroid_data = get_centroid_data(q, ids[q]);
             d = calc_dist(d_pq, centroid_data, qdata + (q * d_pq));
 
-            if (use_cache) pq_dist_cache[q*code_nums + ids[q]] = d;
+            if (use_cache) pq_dist_cache_data[q*code_nums + ids[q]] = d;
         } else {
-            d = pq_dist_cache[q*code_nums + ids[q]];
+            d = pq_dist_cache_data[q*code_nums + ids[q]];
         }
         dist += d;
     }
@@ -133,7 +136,7 @@ float PQDist::calc_dist_pq(int data_id, float *qdata, bool use_cache=true) {
 }
 
 void PQDist::clear_pq_dist_cache() {
-    memset(pq_dist_cache.data(), 0, pq_dist_cache.size() * sizeof(float));
+    // memset(pq_dist_cache.data(), 0, pq_dist_cache.size() * sizeof(float));
 }
 
 void PQDist::load_query_data(const float *_qdata, bool _use_cache) {
@@ -148,13 +151,13 @@ void PQDist::load_query_data_and_cache(const float *_qdata) {
 
 
     for(int i = 0; i < m * code_nums; i++) {
-        pq_dist_cache[i] = calc_dist(d_pq, get_centroid_data(i / code_nums, i % code_nums), qdata.data() + (i / code_nums) * d_pq);
+        pq_dist_cache_data[i] = calc_dist(d_pq, get_centroid_data(i / code_nums, i % code_nums), qdata.data() + (i / code_nums) * d_pq);
 
         // maxx = max(maxx, pq_dist_cache[i]);
         // minn = min(minn, pq_dist_cache[i]);
     }
 
-    pq_dist_cache_data = pq_dist_cache.data();
+    // pq_dist_cache_data = pq_dist_cache.data();
     // this->offset = minn;
     // this->scale = (maxx - minn) / 255.0;
     // for(int i = 0; i < m * code_nums; i++) {
@@ -165,7 +168,7 @@ void PQDist::load_query_data_and_cache(const float *_qdata) {
     _mm_prefetch(pq_dist_cache_data, _MM_HINT_NTA);
 
     size_t prefetch_size = 128;
-    for (int i = 0; i < pq_dist_cache.size() * 4; i += prefetch_size / 4) {
+    for (int i = 0; i < table_size * 4; i += prefetch_size / 4) {
         _mm_prefetch(pq_dist_cache_data + i, _MM_HINT_NTA);
     }
 
@@ -174,7 +177,7 @@ float PQDist::calc_dist_pq_(int data_id, float *qdata, bool use_cache=true) {
     float dist = 0;
     auto ids = get_centroids_id(data_id);
     for (int q = 0; q < m; q++) {
-        dist += pq_dist_cache[q*code_nums + ids[q]];
+        dist += pq_dist_cache_data[q*code_nums + ids[q]];
     }
     return dist;
 }
@@ -220,7 +223,7 @@ float PQDist::calc_dist_pq_simd(int data_id, float *qdata, bool use_cache) {
 
     // 处理剩余的元素
     for (; q < m; q++) {
-        dist += pq_dist_cache[q * code_nums + ids[q]];
+        dist += pq_dist_cache_data[q * code_nums + ids[q]];
         // dist += pq_dist_cache[q * code_nums + code[q]];
     }
 
@@ -266,8 +269,13 @@ void PQDist::load(string filename) {
 
     d_pq = d / m;
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
+    table_size = m * code_nums;
 
-    pq_dist_cache.resize(m * code_nums);
+    if (pq_dist_cache_data != nullptr)
+        delete []pq_dist_cache_data;
+    pq_dist_cache_data = (float*)aligned_alloc(32, sizeof(float) * table_size);
+
+    // pq_dist_cache.resize(m * code_nums);
 
     codes.resize(N / 8 * m * nbits);
     

@@ -24,6 +24,7 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
 }
 
 PQDist::~PQDist() {
+
 }
 
 void PQDist::train(int N, std::vector<float> &xb) {
@@ -146,7 +147,6 @@ void PQDist::load_query_data_and_cache(const float *_qdata) {
     use_cache = true;
 
 
-    float maxx = -1e9, minn = 1e9;
     for(int i = 0; i < m * code_nums; i++) {
         pq_dist_cache[i] = calc_dist(d_pq, get_centroid_data(i / code_nums, i % code_nums), qdata.data() + (i / code_nums) * d_pq);
 
@@ -154,13 +154,13 @@ void PQDist::load_query_data_and_cache(const float *_qdata) {
         // minn = min(minn, pq_dist_cache[i]);
     }
 
+    pq_dist_cache_data = pq_dist_cache.data();
     // this->offset = minn;
     // this->scale = (maxx - minn) / 255.0;
     // for(int i = 0; i < m * code_nums; i++) {
     //     pq_dist_cache_data_ui8[i] = std::round((pq_dist_cache[i] - offset) / scale);
     // }
 
-    pq_dist_cache_data = pq_dist_cache.data();
 
     _mm_prefetch(pq_dist_cache_data, _MM_HINT_NTA);
 

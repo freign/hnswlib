@@ -18,7 +18,7 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
     }
 
     // pq_dist_cache.resize(m * code_nums);
-    pq_dist_cache_data = (float*)aligned_alloc(32, sizeof(float) * table_size);
+    pq_dist_cache_data = (float*)aligned_alloc(64, sizeof(float) * table_size);
     qdata.resize(d);
 
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
@@ -273,7 +273,7 @@ void PQDist::load(string filename) {
 
     if (pq_dist_cache_data != nullptr)
         delete []pq_dist_cache_data;
-    pq_dist_cache_data = (float*)aligned_alloc(32, sizeof(float) * table_size);
+    pq_dist_cache_data = (float*)aligned_alloc(64, sizeof(float) * table_size);
 
     // pq_dist_cache.resize(m * code_nums);
 

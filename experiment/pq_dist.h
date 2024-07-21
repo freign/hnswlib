@@ -69,6 +69,7 @@ inline float PQDist::calc_dist_pq_loaded_simd(int data_id, const uint8_t* centro
     __m256 simd_dist = _mm256_setzero_ps();
     int q;
     for (q = 0; q <= m - 8; q += 8) {
+        __builtin_prefetch(pq_dist_cache_data + q * code_nums, 0, 1);
         // 加载8个uint8_t值到128位寄存器
         __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(centroids + q));
         // __m128i id_vec_128 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(code + q));
@@ -113,6 +114,7 @@ inline float PQDist::calc_dist_pq_loaded(int data_id, const uint8_t* centroids) 
     const float *LookUpTable = pq_dist_cache_data;
     float dist = 0;
     int idx = 0;
+
     // __builtin_prefetch()
     while (centroids < centroid_end) {
         dist += LookUpTable[*centroids];

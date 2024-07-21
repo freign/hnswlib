@@ -35,7 +35,6 @@ float test_approx(
         dist_t nn_node;
 
         global_config->nn_dist = nn_dist;
-
         auto result = appr_alg->searchKnn(query_data_loader->point_data(i), K);
         recall += gt_loader->calc_recall(result, i, K);
         // cout << "i = " << i << " recall = " << gt_loader->calc_recall(result, i, K) << "\n";
@@ -44,15 +43,15 @@ float test_approx(
         // global_config->use_extent_neighbor = 0;
 
 
-        while (result.size()) {
-            nn_dist = result.top().first;
-            nn_node = result.top().second;
-            // cout << "not gt " << nn_node << " " << nn_dist << "\n";
-            result.pop();
-        }
-        nn_dist = sqrt(nn_dist);
+        // while (result.size()) {
+        //     nn_dist = result.top().first;
+        //     nn_node = result.top().second;
+        //     // cout << "not gt " << nn_node << " " << nn_dist << "\n";
+        //     result.pop();
+        // }
+        // nn_dist = sqrt(nn_dist);
 
-        dist_t ep_dist = sqrt(global_config->ep_dist.back());
+        // dist_t ep_dist = sqrt(global_config->ep_dist.back());
         // cout << "nn node = " << nn_node << " nn_dist = " << nn_dist << "\n";
 
         // if (appr_alg->reverse_edges[ep_dist].size() < 10) {
@@ -61,7 +60,7 @@ float test_approx(
         // cout << ep_dist - nn_dist << " " << global_config->tot_dist_calc - lst_tot_calc << "\n";
         // cout << global_config->tot_dist_calc - lst_tot_calc << "\n";
         // cout << "\n";
-        lst_tot_calc = global_config->tot_dist_calc;
+        // lst_tot_calc = global_config->tot_dist_calc;
     }
     return recall / qsize;
 }

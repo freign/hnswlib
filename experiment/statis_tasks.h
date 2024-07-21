@@ -65,6 +65,7 @@ public:
     void test() {
 
         build_graph();
+        config->tag_build_graph_completed = 1;
         config->statis_recursive_len = 0;
         config->use_dir_vector = 0;
         config->statis_ep_dis = 0;
@@ -97,9 +98,9 @@ public:
             alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
             alg_hnsw->pq_dist->load(pq_file);
 
-            // alg_hnsw->pq_dist->extract_centroid_ids(alg_hnsw->max_elements_);
-            // alg_hnsw->extract_neigbor_centroids();
-            // std::cout << "PQ ready" << std::endl;
+            std::cout << "extract neighbor centroids\n";
+            alg_hnsw->pq_dist->extract_centroid_ids(alg_hnsw->max_elements_);
+            alg_hnsw->extract_neigbor_centroids();
         }
         config->test_ep_with_calc = 1;
         config->ep_dist_limit = 0.4;
@@ -114,7 +115,8 @@ public:
             cout << "test brute force ep\n";
         }
 
-        alg_hnsw->get_neighbors();
+        // alg_hnsw->get_neighbors();
+        std::cout << "begin to test recall" << std::endl;
         test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
         cout << "query elements: " << query_data_loader->get_elements() << "\n";
         cout << "max level = " << config->max_level << "\n";

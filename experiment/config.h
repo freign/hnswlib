@@ -83,6 +83,7 @@ struct Config {
     bool use_extent_neighbor = 0;
 
     bool use_PQ = 0;
+    bool tag_build_graph_completed = 0;
     // PQDist tem;
     vector<vector<int> > point_search;
 };

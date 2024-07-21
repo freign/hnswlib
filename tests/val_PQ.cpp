@@ -119,15 +119,20 @@ int main(int argc, char *argv[])
     cout << "load time " << LoadTimer.getElapsedTimeMicro() / 1e3 << endl;
 
     
+    pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(0)));
     StopW PQTimer;
     PQTimer.reset();
     vector<float> pqs;
     for (int j = 0; j < query_data_loader->get_elements(); j += 1)
     {
-        pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(j)));
+        // pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(j)));
+        auto ids = pq_dist->get_centroids_id(0);
+
         for (int i : points_search[j])
         {
-            float distPQ = pq_dist->calc_dist_pq_loaded_simd(i);
+            i = 0;
+            float distPQ = pq_dist->calc_dist_pq_loaded_simd(0, ids.data());
+            // float distPQ = pq_dist->calc_dist_pq_loaded(0, ids.data());
             // float distPQ = pq_dist->calc_dist_pq_loaded_simd_scale(i);
             pqs.push_back(distPQ);
         }
@@ -141,6 +146,7 @@ int main(int argc, char *argv[])
     {
         for (int i : points_search[j])
         {
+            i = 0;
             float real_dist = space.get_dist_func()(
                 query_data_loader->point_data(j), data_loader->point_data(i), space.get_dist_func_param());
             reals.push_back(real_dist);

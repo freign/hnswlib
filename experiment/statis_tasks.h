@@ -15,12 +15,12 @@
 #include "config.h"
 #include "dir_vector.h"
 #include "k_means.h"
-
 using namespace std;
 
 template<typename dist_t>
 class Tester {
 public:
+    CommandLineOptions *opt_;
     Tester(
         CommandLineOptions *opt,
         DataLoader *_data_loader,
@@ -30,7 +30,8 @@ public:
         string dist_t_type,
         int _M,
         Config *_config): M(_M), ef_construction(200) {
-
+        
+        opt_ = opt;
         data_dir = opt->dataDir;
         data_path = opt->point_data_path;
         query_data_path = opt->query_data_path;
@@ -73,7 +74,7 @@ public:
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
         config->use_extent_neighbor = 0;
-        config->use_PQ = 1;
+        config->use_PQ = opt_->use_pq;
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
             alg_hnsw->get_extent_neighbors();
@@ -102,6 +103,12 @@ public:
             alg_hnsw->pq_dist->extract_centroid_ids(alg_hnsw->max_elements_);
             alg_hnsw->extract_neigbor_centroids();
         }
+
+        // {
+        //     alg_hnsw->test_pq_dist();
+        //     exit(0);
+        // }
+
         config->test_ep_with_calc = 1;
         config->ep_dist_limit = 0.4;
 

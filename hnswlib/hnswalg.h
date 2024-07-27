@@ -173,6 +173,27 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         revSize_ = 1.0 / mult_;
     }
 
+    void test_pq_dist() {
+        float avg_dist = 0;
+        int tot = 0;
+        for (int i = 0; i < max_elements_; i++) {
+            int *data = (int *) get_linklist0(i);
+            auto ids = pq_dist->get_centroids_id(i);
+            size_t size = getListCount((linklistsizeint*)data);
+            for (int j = 1; j <= size; j++) {
+                int n = data[j];
+                auto idn = pq_dist->get_centroids_id(n);
+                int d = 0;
+                for (int j = 0; j < ids.size(); j++) {
+                    d += ids[j] != idn[j];
+                }
+                avg_dist += d;
+                tot++; 
+            }
+        }
+        avg_dist /= tot;
+        std::cout << "avg dist = " << avg_dist << "\n";
+    }
 
     ~HierarchicalNSW() {
         clear();

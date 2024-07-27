@@ -13,7 +13,7 @@ struct CommandLineOptions {
     std::string point_data_path;  // Path to point data
     std::string query_data_path;  // Path to query data
     int maxElements;              // Maximum number of elements
-
+    bool use_pq;
     CommandLineOptions();
     CommandLineOptions(const std::string& dir, const std::string& name, int maxElems);
 };

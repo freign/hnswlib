@@ -9,21 +9,23 @@ CommandLineOptions::CommandLineOptions(const std::string& dir, const std::string
 
 // ArgParser function definition
 CommandLineOptions ArgParser(int argc, char* argv[]) {
-    if (argc < 5) {
-        std::cerr << "Usage: " << argv[0] << " [point_data_path] [query_data_path] [data_name] [max_elements]" << std::endl;
+    if (argc < 6) {
+        std::cerr << "Usage: " << argv[0] << " [point_data_path] [query_data_path] [data_name] [max_elements] [use_pq]" << std::endl;
         return CommandLineOptions();
     }
     std::string point_data_path = argv[1];
     std::string query_data_path = argv[2];
     std::string data_name = argv[3];
     int max_elements = std::atoi(argv[4]);
+    int use_pq = std::atoi(argv[5]);
 
     CommandLineOptions opt;
     opt.dataName = data_name;
     opt.point_data_path = point_data_path;
     opt.query_data_path = query_data_path;
     opt.maxElements = max_elements;
-
+    opt.use_pq = use_pq;
+    
     fs::path pathObj(opt.point_data_path);
     opt.dataDir = pathObj.parent_path().string(); // Use .string() instead of .c_str()
 
@@ -32,6 +34,7 @@ CommandLineOptions ArgParser(int argc, char* argv[]) {
     std::cout << "Query Data Path: " << opt.query_data_path << std::endl;
     std::cout << "Data Name: " << opt.dataName << std::endl;
     std::cout << "Max Elements: " << opt.maxElements << std::endl;
+    std::cout << "Max Elements: " << opt.use_pq << std::endl;
 
     return opt;
 }

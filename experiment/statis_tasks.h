@@ -74,7 +74,15 @@ public:
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
         config->use_extent_neighbor = 0;
-        config->use_PQ = opt_->use_pq;
+
+        ifstream pq_cfg(opt_->pq_cfg_file);
+        string pq_option_name;
+        if (!pq_cfg.is_open()) {
+            cerr << "pq cfg read fail: " << opt_->pq_cfg_file << "\n";
+            exit(-1);
+        }
+        pq_cfg >> pq_option_name >> config->use_PQ;
+
         if (config->use_extent_neighbor) {
             cout << "use extent neighbors\n";
             alg_hnsw->get_extent_neighbors();
@@ -85,12 +93,15 @@ public:
             alg_hnsw->dir_vectors_ptr = &dir_vectors;
         }
         if (config->use_PQ) {
-            cout << "use PQ to calculate dist\n";
 
 
             int d = 960;
-            int m = 240;
-            int nbits = 4;
+            int m;
+            int nbits;
+            pq_cfg >> pq_option_name >> m;
+            pq_cfg >> pq_option_name >> nbits;
+            cout << "use PQ to calculate dist\n";
+            cout << "PQ config " << " m = " << m << " nbits = " << nbits << "\n";
 
             // load from file
             string pq_dir = "/share/ann_benchmarks/gist/";
@@ -103,7 +114,7 @@ public:
             alg_hnsw->pq_dist->extract_centroid_ids(alg_hnsw->max_elements_);
             alg_hnsw->extract_neigbor_centroids();
         }
-
+        pq_cfg.close();
         // {
         //     alg_hnsw->test_pq_dist();
         //     exit(0);

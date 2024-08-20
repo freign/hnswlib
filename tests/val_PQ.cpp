@@ -21,6 +21,43 @@ using namespace std;
 using DATALOADER::DataLoader;
 using namespace faiss;
 
+float euclidean_distance_simd(const int16_t* vec1, const int16_t* vec2, int dim) {
+    // 累加距离平方和的向量
+    __m256i sum_vec = _mm256_setzero_si256();
+
+    // 每次处理16个int16元素
+    for (int i = 0; i < dim; i += 16) {
+        // 加载vec1和vec2的16个元素
+        __m256i vec1_chunk = _mm256_loadu_si256((__m256i*)&vec1[i]);
+        __m256i vec2_chunk = _mm256_loadu_si256((__m256i*)&vec2[i]);
+
+        // 计算两个向量块的差
+        __m256i diff = _mm256_sub_epi16(vec1_chunk, vec2_chunk);
+
+        // 将差平方
+        __m256i diff_squared = _mm256_mullo_epi16(diff, diff);
+
+        // 累加差平方和
+        sum_vec = _mm256_add_epi32(sum_vec, _mm256_madd_epi16(diff_squared, _mm256_set1_epi16(1)));
+    }
+
+    // 将累加结果的各部分相加
+    __m128i sum_low = _mm256_castsi256_si128(sum_vec);
+    __m128i sum_high = _mm256_extracti128_si256(sum_vec, 1);
+    __m128i sum = _mm_add_epi32(sum_low, sum_high);
+
+    // 将128位结果中的各部分相加
+    sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 8));
+    sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 4));
+
+    // 提取最终结果
+    int32_t distance_squared = _mm_cvtsi128_si32(sum);
+
+    // 返回欧式距离
+    return sqrtf((float)distance_squared);
+}
+
+
 int main(int argc, char *argv[])
 {
     //CommandLineOptions opt = ArgParser(argc, argv);
@@ -29,7 +66,6 @@ int main(int argc, char *argv[])
     int nbits = atoi(argv[2]);
     int M = 16;
     int ef_construction = 200;
-
     string gist_dir = "/share/ann_benchmarks/gist/";
 
     DataLoader *data_loader = new DataLoader("f", 1000000, gist_dir + "train.fvecs", "gist");
@@ -125,35 +161,76 @@ int main(int argc, char *argv[])
     vector<float> pqs;
     for (int j = 0; j < query_data_loader->get_elements(); j += 1)
     {
-        // pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(j)));
-        auto ids = pq_dist->get_centroids_id(0);
+        pq_dist->load_query_data_and_cache(reinterpret_cast<const float *>(query_data_loader->point_data(j)));
 
         for (int i : points_search[j])
         {
             i = 0;
+            auto ids = pq_dist->get_centroids_id(i);
             float distPQ = pq_dist->calc_dist_pq_loaded_simd(0, ids.data());
             // float distPQ = pq_dist->calc_dist_pq_loaded(0, ids.data());
-            // float distPQ = pq_dist->calc_dist_pq_loaded_simd_scale(i);
             pqs.push_back(distPQ);
         }
     }
+    std::cout << "here" << std::endl;
     cout << "PQ time " << PQTimer.getElapsedTimeMicro() / 1e3 << endl;
 
     StopW RealTimer;
     RealTimer.reset();
     vector<float> reals;
+    vector<float> vec_tem(960);
+    memcpy(vec_tem.data(), data_loader->point_data(0), sizeof(float) * 960);
+    int tot = 0;
     for (int j = 0; j < query_data_loader->get_elements(); j += 1)
     {
+        int idx = 0;
+        tot +=    [j].size();
         for (int i : points_search[j])
         {
-            i = 0;
             float real_dist = space.get_dist_func()(
                 query_data_loader->point_data(j), data_loader->point_data(i), space.get_dist_func_param());
             reals.push_back(real_dist);
             // cout << distPQ << " " << real_dist << "\n";
         }
     }
+    cout << "tot = " << tot << "\n";
     cout << "real time " << RealTimer.getElapsedTimeMicro() / 1e3 << endl;
+
+
+    StopW UINTTimer;
+    UINTTimer.reset();
+    
+    hnswlib::L2SpaceI spacei(960);
+    vector<int16_t> vec1(960), vec2(960);
+    vector<float> fvec1(960), fvec2(960);
+    for (int i = 0; i < 960; i++) {
+        vec1[i] = rand();
+        vec2[i] = rand();
+        fvec1[i] = rand();
+        fvec2[i] = rand();
+    }
+    vector<float> int16_results;
+    float sum = 0;
+    for (int j = 0; j < query_data_loader->get_elements(); j += 1)
+    {
+        for (int i : points_search[j])
+        {
+            i = 0;
+            // float dist = L2SqrI16(vec1.data(), vec2.data(), 960);
+            // float dist = L2Sqr(query_data_loader->point_data(j), data_loader->point_data(i), 960);
+            float dist = euclidean_distance_simd(vec1.data(), vec2.data(), 960);
+
+            // float dist = space.get_dist_func()(
+            //     query_data_loader->point_data(j), data_loader->point_data(i), space.get_dist_func_param());
+            sum += dist;
+            int16_results.push_back(dist);
+            // cout << distPQ << " " << real_dist << "\n";
+        }
+    }
+    std::cout << sum << "\n";
+    cout << "int16 time " << UINTTimer.getElapsedTimeMicro() / 1e3 << endl;
+
+
     assert(pqs.size() == reals.size());
 
     float error = 0;
@@ -168,152 +245,7 @@ int main(int argc, char *argv[])
     error /= pqs.size();
     cout << "error = " << error << "\n";
 
+
+
     return 0;
 }
-
-/* int main(int argc, char *argv[])
-{
-    int m = atoi(argv[1]);
-    int nbits = atoi(argv[2]);
-    PQDist *pq_dist = new PQDist(960, m, nbits);
-    string path = "../../python_gist/encoded_data_" + to_string(m) + "_" + to_string(nbits);
-    pq_dist->load(path);
-    pq_dist->construct_distance_table();
-    DataLoader *data_loader = new DataLoader("f", 1000000, "../../gist/train.fvecs", "gist");
-    hnswlib::L2Space space(960);
-    DataLoader *query_data_loader = new DataLoader("f", 1000, "../../gist/test.fvecs", "gist");
-    ifstream file("../point_search.txt");
-    string line;
-    vector<vector<int>> points_search(1000);
-    int t = 0;
-    while (getline(file, line))
-    {
-        istringstream ls(line);
-        int id;
-        while (ls >> id)
-        {
-            points_search[t].push_back(id);
-        }
-        t++;
-    }
-    float avg_error = 0;
-    int times = 0;
-    vector<float> true_distances;
-    vector<float> pq_distances;
-    auto start0 = std::chrono::high_resolution_clock::now();
-    for(int i = 0; i < 1000; i++)
-    {
-        for(int j : points_search[i])
-        {
-            float true_distance = space.get_dist_func()(data_loader->point_data(j), query_data_loader->point_data(i), space.get_dist_func_param());
-            true_distances.push_back(true_distance);
-            times ++;
-        }
-    }
-    auto end0 = std::chrono::high_resolution_clock::now();
-    auto duration0 = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start0);
-    cout << duration0.count() << endl;
-    auto start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < 1000; i++)
-    {
-        float *q = (float *)query_data_loader->point_data(i);
-        vector<int> qids = pq_dist->encode_query(q);
-        for (int j : points_search[i])
-        {
-
-            //cout << true_distance << endl;
-            float pq_distance = pq_dist->calc_dist_pq_from_table(j, qids);
-            pq_distances.push_back(pq_distance);
-            //cout << pq_distance << endl;
-        }
-    }
-    auto end1 = std::chrono::high_resolution_clock::now();
-    auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1);
-    cout << duration1.count() << endl;
-    for (int i = 0; i < times; i++)
-    {
-        float error = abs(true_distances[i] - pq_distances[i]);
-        avg_error += error;
-    }
-    avg_error /= times;
-    cout << avg_error << endl;
-} */
-/* int step = 1000000;
-float avg_error = 0;
-int t = 0;
-int t_pq = 0;
-auto start0 = std::chrono::high_resolution_clock::now();
-for(int i = 0; i < 1000; i += step)
-for(int j = 0; j < 1000000; j += step)
-{
-    float true_distance = space.get_dist_func()(data_loader->point_data(j), query_data_loader->point_data(i), space.get_dist_func_param());
-    cout << true_distance << endl;
-}
-auto end0 = std::chrono::high_resolution_clock::now();
-auto duration0 = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start0);
-t = duration0.count();
-auto start1 = std::chrono::high_resolution_clock::now();
-for(int i = 0; i < 1000; i += step)
-{
-    float *q = (float *)query_data_loader->point_data(i);
-    vector<int> qids = pq_dist->encode_query(q);
-    for(int j = 0; j < 1000000; j += step)
-    {
-        float pq_distance = pq_dist->calc_dist_pq_from_table(j, qids);
-        cout << pq_distance << endl;
-    }
-}
-auto end1 = std::chrono::high_resolution_clock::now();
-auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1);
-t_pq = duration1.count();
-cout << t << " " << t_pq << endl; */
-/* for (int i = 0; i < 1000; i += step)
-{
-    float *q = (float *)query_data_loader->point_data(i);
-    vector<int> qids = pq_dist->encode_query(q);
-    auto end0 = std::chrono::high_resolution_clock::now();
-    auto duration0 = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start0);
-    t_pq_1 += duration0.count();
-    for (int j = 0; j < 100000; j += step)
-    {
-
-        float *d = (float *)data_loader->point_data(j);
-        auto start1 = std::chrono::high_resolution_clock::now();
-        float true_distance = space.get_dist_func()(data_loader->point_data(j), query_data_loader->point_data(i), space.get_dist_func_param());
-        //cout << true_distance << endl;
-        // float true_distance = 0;
-        // for(int i=0;i<960;i++)
-        // true_distance += (d[i]-q[i])*(d[i]-q[i]);
-        auto end1 = std::chrono::high_resolution_clock::now();
-        auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - start1);
-        t += duration1.count();
-        auto start2 = std::chrono::high_resolution_clock::now();
-        float pq_distance = pq_dist->calc_dist_pq_from_table(j, qids);
-        //cout << pq_distance << endl;
-        auto end2 = std::chrono::high_resolution_clock::now();
-        auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
-        t_pq_2 += duration2.count();
-        float error = abs(true_distance - pq_distance);
-        avg_error += error;
-    }
-}
-int a = 0;
-int b = 0;
-auto start = std::chrono::high_resolution_clock::now();
-for(int i=0;i<1000;i++)
-for(int j=0;j<100000;j++)
-{
-    auto start = std::chrono::high_resolution_clock::now();
-    float dist = space.get_dist_func()(query_data_loader->point_data(i), data_loader->point_data(j), space.get_dist_func_param());
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    a += duration.count();
-}
-auto end = std::chrono::high_resolution_clock::now();
-auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-cout << "time = " << duration.count() << endl;
-cout << "time = " << a << endl;
-
-avg_error = avg_error / (d_c * q_c);
-cout << t << " " << t_pq_1 << " " << t_pq_2 << " " << avg_error << endl; */
-/* } */

@@ -16,7 +16,6 @@ plot_dir /root/gist   # 图片存放的目录
 ```
 python3 run.py
 ```
-config->use_dir_vector指示了是否使用方向向量
 
 算法运行之后会在数据所在的目录创建.res文件，保存结果
 

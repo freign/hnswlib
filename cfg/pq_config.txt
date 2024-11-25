@@ -1,3 +1,0 @@
-use_pq 1
-m 320
-nbits 4

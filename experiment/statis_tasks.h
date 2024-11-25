@@ -98,14 +98,21 @@ public:
             int d = 960;
             int m;
             int nbits;
+            int n;
+            string pq_dir;
             pq_cfg >> pq_option_name >> m;
             pq_cfg >> pq_option_name >> nbits;
+            pq_cfg >> pq_option_name >> n;
+            pq_cfg >> pq_option_name >> pq_dir;
+
             cout << "use PQ to calculate dist\n";
             cout << "PQ config " << " m = " << m << " nbits = " << nbits << "\n";
 
             // load from file
-            string pq_dir = "/share/ann_benchmarks/gist/";
-            string pq_file = pq_dir + "encoded_data_100000_" + to_string(m) + "_" + to_string(nbits);
+            // pq_dir = "/share/ann_benchmarks/gist/";
+            string pq_file = pq_dir + "encoded_data_" + to_string(n) + "_" + to_string(m) + "_" + to_string(nbits);
+            // string pq_file = pq_dir + "encoded_data_100000_" + to_string(m) + "_" + to_string(nbits);
+
             // string pq_file = "../PQ/pq_" + to_string(data_loader->get_elements()) + ".txt";
             alg_hnsw->pq_dist = std::move(make_unique<PQDist>(d, m, nbits));
             alg_hnsw->pq_dist->load(pq_file);

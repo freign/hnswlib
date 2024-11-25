@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
     for (int j = 0; j < query_data_loader->get_elements(); j += 1)
     {
         int idx = 0;
-        tot +=    [j].size();
+        // tot +=    [j].size();
         for (int i : points_search[j])
         {
             float real_dist = space.get_dist_func()(

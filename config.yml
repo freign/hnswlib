@@ -1,0 +1,8 @@
+use_pq 1
+m 320
+nbits 4
+n 10000
+pq_dir /share/ann_benchmarks/gist/
+train_dir /root/gist/train.fvecs
+test_dir /root/gist/test.fvecs
+plot_dir /root/gist

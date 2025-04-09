@@ -5,7 +5,7 @@ def run_experiment():
     n = -1
     train_dir = ""
     test_dir = ""
-    config_path = "config.yml"
+    config_path = "config_sift.yml"
     try:
         with open(config_path, 'r') as file:
             for line in file:
@@ -16,6 +16,9 @@ def run_experiment():
                     _, train_dir = line.split()
                 if line.startswith('test_dir '):
                     _, test_dir = line.split()
+                if line.startswith('dataset '):
+                    _, dataset = line.split()
+                    
                 
             if (n == -1):
                 raise ValueError("No line starting with 'n ' found in config file.")
@@ -27,7 +30,7 @@ def run_experiment():
         "./build/experiment",
         train_dir,
         test_dir,
-        "gist",
+        dataset,
         n,
         config_path
     ]

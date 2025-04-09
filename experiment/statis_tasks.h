@@ -74,6 +74,9 @@ public:
         config->high_level_dist_calc = 0;
         config->test_nn_path_len = 0;
         config->use_extent_neighbor = 0;
+        int m;
+        int nbits;
+        int n;
 
         ifstream pq_cfg(opt_->pq_cfg_file);
         string pq_option_name;
@@ -96,9 +99,7 @@ public:
 
 
             int d = 960;
-            int m;
-            int nbits;
-            int n;
+           
             string pq_dir;
             pq_cfg >> pq_option_name >> m;
             pq_cfg >> pq_option_name >> nbits;
@@ -142,7 +143,7 @@ public:
 
         // alg_hnsw->get_neighbors();
         std::cout << "begin to test recall" << std::endl;
-        test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config);
+        test_vs_recall(data_dir, data_loader, query_data_loader, gt_loader, alg_hnsw, 10, config, m, nbits);
         cout << "query elements: " << query_data_loader->get_elements() << "\n";
         cout << "max level = " << config->max_level << "\n";
         cout << "tot dist calc = " << config->tot_dist_calc << " dist calc avoid = " << config->disc_calc_avoided << "\n";
@@ -159,8 +160,6 @@ public:
             alg_hnsw->addPoint(data_loader->point_data(i), i);
         }
         alg_hnsw->calc_neighbor_dist();
-
-
         // vector<int> tem;
         // for (int i = 0; i < max_elements; i++) {
         //     if (alg_hnsw->element_levels_[i] == 1) tem.push_back(i);
@@ -173,7 +172,6 @@ public:
         //     }
         // }
         // exit(0);
-
         cout << "build graph finished\n";
     }
 

@@ -88,7 +88,6 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     std::vector<std::vector<uint8_t> > neighbor_centroids;
     
     void extract_neigbor_centroids() {
-
         neighbor_centroids.resize(max_elements_ + 1);
         for (int i = 0; i < max_elements_; i++) {
             int *data = (int *) get_linklist0(i);
@@ -465,13 +464,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             if (config->use_PQ) {
                 neighbors_centroid_ids = neighbor_centroids[current_node_id].data();
                 _mm_prefetch((const char *) neighbors_centroid_ids, _MM_HINT_T0);
-                neighbors_centroid_ids -= pq_dist->m;
+                neighbors_centroid_ids -= pq_dist->m*pq_dist->nbits/8;
             }
 
             for (size_t j = 1; j <= size; j++) {
                 int candidate_id = *(data + j);
                 if (config->use_PQ) {
-                    neighbors_centroid_ids += pq_dist->m;
+                    neighbors_centroid_ids += pq_dist->m*pq_dist->nbits/8;
                 }
 
 //                    if (candidate_id == 0) continue;
@@ -482,8 +481,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                     _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
                                     _MM_HINT_T0);  ////////////
                 } else {
-                    _mm_prefetch(neighbors_centroid_ids + pq_dist->m, _MM_HINT_T0);
-                    _mm_prefetch(neighbors_centroid_ids + pq_dist->m + 64, _MM_HINT_T0);
+                    _mm_prefetch(neighbors_centroid_ids + pq_dist->m*pq_dist->nbits/8, _MM_HINT_T0);
+                    _mm_prefetch(neighbors_centroid_ids + pq_dist->m*pq_dist->nbits/8 + 64, _MM_HINT_T0);
                 }
 #endif
                 if (!(visited_array[candidate_id] == visited_array_tag)) {

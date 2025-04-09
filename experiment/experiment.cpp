@@ -77,6 +77,18 @@ int main(int argc, char *argv[]) {
         begin_tst(rt, config);
 
     }
+    else if(opt.dataName == "sift") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "sift");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "sift");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 128);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    } else {
+        cout << "data name error\n";
+    }
 
     return 0;
 }

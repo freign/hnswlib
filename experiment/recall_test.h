@@ -73,10 +73,19 @@ void test_vs_recall(
     GroundTruth::GT_Loader *gt_loader,
     hnswlib::HierarchicalNSW<dist_t> *appr_alg,
     size_t K,
-    Config *config) {
+    Config *config,
+    int m,
+    int nbits) {
+    
+    string result_file_path;
+    if(config -> use_PQ) {
+        result_file_path = data_dir + "/result_" 
+            + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + "_pq" + std::to_string(m) + "_" + std::to_string(nbits) + ".res";
+    } else {
+        result_file_path = data_dir + "/result_" 
+            + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + "oro.res";
+    }
 
-    std::string result_file_path = data_dir + "/result_" 
-        + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + ".res";
     
     std::ofstream file(result_file_path);
 

@@ -42,8 +42,9 @@ void PQDist::train(int N, std::vector<float> &xb) {
 // 获取每个quantizer对应的质心id
 vector<uint8_t> PQDist::get_centroids_id(int id) {
     const uint8_t *code = codes.data() + id * (this->m * this->nbits / 8);
-    vector<uint8_t> centroids_id(m, 0);
-    if (nbits == 8) {
+    vector<uint8_t> centroids_id(m * nbits / 8, 0);
+    memcpy(centroids_id.data(), code, m * sizeof(uint8_t) * nbits / 8);
+   /*  if (nbits == 8) {
         size_t num_ids = m;  // 每8bit一个id
         size_t num_bytes = num_ids;
         centroids_id.resize(num_ids);
@@ -100,8 +101,7 @@ vector<uint8_t> PQDist::get_centroids_id(int id) {
             centroids_id[j] = code[i] & 0x0F;           // 提取低4位
             centroids_id[j + 1] = (code[i] >> 4) & 0x0F; // 提取高4位
         }
-
-    }
+    } */
     return centroids_id;
 }
 
@@ -277,6 +277,9 @@ void PQDist::load(string filename) {
 
     // pq_dist_cache.resize(m * code_nums);
 
+    centroids.resize(code_nums * d);
+    fin.read(reinterpret_cast<char*>(centroids.data()), 4 * centroids.size());
+
     codes.resize(N / 8 * m * nbits);
     
     fin.read(reinterpret_cast<char*>(codes.data()), codes.size());
@@ -287,8 +290,7 @@ void PQDist::load(string filename) {
     // }
     // cout << "\n";
 
-    centroids.resize(code_nums * d);
-    fin.read(reinterpret_cast<char*>(centroids.data()), 4 * centroids.size());
+    
 
     // auto code = get_centroids_id(0);
     // for (int i = 0; i < m; i++) {
@@ -340,17 +342,17 @@ float PQDist::calc_dist_pq_from_table(int data_id, vector<int>& qids) {
 }
 
 void PQDist::extract_centroid_ids(int n) {
-    centroid_ids.resize(n * m);
+    centroid_ids.resize(n * m * nbits/8);
     for (int i = 0; i < n; i++) {
         auto ids = get_centroids_id(i);
-        memcpy(centroid_ids.data() + i*m, ids.data(), m);
+        memcpy(centroid_ids.data() + i*m*nbits/8, ids.data(), m*nbits/8);
     }
 }
 
 void PQDist::extract_neighbor_centroid_ids(vector<uint8_t> &result, int *neighbors, int size) {
-    result.resize(m * size);
+    result.resize(m*nbits/8 * size);
     for (int i = 0; i < size; i++) {
         int neighbor = neighbors[i];
-        memcpy(result.data() + i*m, centroid_ids.data() + neighbor*m, m);
+        memcpy(result.data() + i*m*nbits/8, centroid_ids.data() + neighbor*m*nbits/8, m*nbits/8);
     }
 }

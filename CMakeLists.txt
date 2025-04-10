@@ -109,12 +109,12 @@ endif()
     # endif()
   
 
-option(ENABLE_DEBUG "Enable debug symbols" OFF)
+option(ENABLE_DEBUG "Enable debug symbols" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 
 if (ENABLE_DEBUG)
-    SET( CMAKE_CXX_FLAGS  "-g -mavx2 -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
+    SET( CMAKE_CXX_FLAGS  "-g -mavx2 -Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize -fsanitize=address" )
 else()
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         SET( CMAKE_CXX_FLAGS  "-Ofast -std=c++17 -DHAVE_CXX0X -openmp -fpic -ftree-vectorize" )
@@ -193,7 +193,7 @@ find_package(LAPACK REQUIRED)
 find_path(FAISS_INCLUDE_DIR faiss/Index.h)
 find_library(FAISS_LIBRARY faiss)
 
-if (NOT FAISS_INCLUDE_DIR OR NOT FAISS_LIBRARY)
+if (NOT FAISS_INCLUDE_DIR OR NOT FAISS_LIBRARY)#
     message(FATAL_ERROR "Faiss library not found")
 endif()
 
@@ -211,42 +211,10 @@ target_link_libraries(experiment
     hnswlib
 )
 
-add_executable(val_kmeans 
-    # experiment/k_means.cpp
-    tests/val_kmeans.cpp
-    ${EXPERIMENT_SOURCES}
-)
-target_link_libraries(val_kmeans
-    OpenMP::OpenMP_CXX
-    ${FAISS_LIBRARY}
-    ${BLAS_LIBRARIES}
-    ${LAPACK_LIBRARIES}
-    hnswlib
-)
 
-add_executable(val_da 
-    # experiment/k_means.cpp
-    tests/val_degree_adjustment.cpp
-    ${EXPERIMENT_SOURCES}
-)
-target_link_libraries(val_da
-    OpenMP::OpenMP_CXX
-    ${FAISS_LIBRARY}
-    ${BLAS_LIBRARIES}
-    ${LAPACK_LIBRARIES}
-    hnswlib
-)
 
-add_executable(val_pq
-    # experiment/k_means.cpp
-    tests/val_PQ.cpp
-    ${EXPERIMENT_SOURCES}
-)
+
+
+
 # 链接OpenMP库，BLAS库，LAPACK库
-target_link_libraries(val_pq
-    OpenMP::OpenMP_CXX
-    ${FAISS_LIBRARY}
-    ${BLAS_LIBRARIES}
-    ${LAPACK_LIBRARIES}
-    hnswlib
-)
+

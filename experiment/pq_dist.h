@@ -57,10 +57,72 @@ public:
     float calc_dist_pq_loaded_simd_scale(int data_id);
 
     float *pq_dist_cache_data = nullptr;
+    uint8_t* pq_dist_cache_data_uint8 = nullptr;
+    float scale;
+    float minx, maxx;
+    std::unique_ptr<__m512i[]> simd_registers = nullptr;
 
     vector<uint8_t> centroid_ids;
     void extract_centroid_ids(int n);
-    void extract_neighbor_centroid_ids(vector<uint8_t> &result, int *neighbor, int size);
+    void extract_neighbor_centroid_ids(uint8_t* &result, int *neighbor, int size);
+    inline void transpose(uint8_t* encodes, int size) {
+        // encodes的大小是batch_size的倍数，
+        // 将encodes由N * (m * nbits / 8)转置为(N / batch_size * m * nbits / 8) * batch_size
+        // 只支持nbits = 4
+        //batch_size=16，注意不足的部分。size大小有可能不是16的倍数。
+
+        int batch_size = 16;
+        //注意不足的部分。。。。。
+        int scale_size = (size + 15) & (~15);
+        int batch_num = scale_size / batch_size;
+        //int batch_remain = size % batch_size;
+        uint8_t *tmp = (uint8_t *)aligned_alloc(64, m * batch_size * nbits / 8 * sizeof(uint8_t));
+        for (int i = 0; i < batch_num; i++)
+        {
+            for (int j = 0; j < batch_size; j++)
+                for (int k = 0; k < m * nbits / 8; k++)
+                {
+                    tmp[k * batch_size + j] = encodes[(i * batch_size + j) * m * nbits / 8 + k];
+                }
+            memcpy(encodes + i * batch_size * m * nbits / 8, tmp, m * batch_size * nbits / 8);
+        }
+        
+        
+        free(tmp);
+    }
+    void calc_dist_ultimate(uint8_t *encodes, int size, float *dists);
+    
+    inline void set_registers() {
+        // 设置寄存器的值
+
+        uint8_t *temp_buffers = (uint8_t *)aligned_alloc(64, sizeof(uint8_t) * 4 * (1 << nbits));
+        for (int i = 0; i < m; i += 8)
+        {
+    
+            memcpy(temp_buffers, pq_dist_cache_data_uint8 + i * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 2) * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 4) * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 6) * code_nums, sizeof(uint8_t) * code_nums);
+            simd_registers[2 * i / 8] = _mm512_load_si512(temp_buffers);
+            // print_m512i_uint8(simd_registers[i / 8]);
+            memcpy(temp_buffers, pq_dist_cache_data_uint8 + (i + 1) * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 3) * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 5) * code_nums, sizeof(uint8_t) * code_nums);
+            memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 7) * code_nums, sizeof(uint8_t) * code_nums);
+            simd_registers[2 * i / 8 + 1] = _mm512_load_si512(temp_buffers);
+        }
+        free(temp_buffers);
+        //cout << "END SET" << endl;
+    }
+    
+    
+    inline void extract_and_upcast_and_add(__m512i& acc, __m512i& a){
+        acc = _mm512_add_epi32(acc, _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(a, 0)));
+        acc = _mm512_add_epi32(acc, _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(a, 1)));
+        acc = _mm512_add_epi32(acc, _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(a, 2)));
+        acc = _mm512_add_epi32(acc, _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32(a, 3)));
+    }
+
 };
 
 inline float PQDist::calc_dist_pq_loaded_simd(int data_id, const uint8_t *centroids)
@@ -145,3 +207,8 @@ inline float PQDist::calc_dist_pq_loaded(int data_id, const uint8_t *centroids)
 }
 
 #endif // !PQ_DIST_H
+
+
+
+
+

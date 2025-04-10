@@ -34,6 +34,7 @@ def run_experiment():
         n,
         config_path
     ]
+    print('Command to run:', ' '.join(command))
 
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

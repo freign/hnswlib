@@ -19,6 +19,7 @@ using DATALOADER::DataLoader;
 template<typename dist_t>
 void begin_tst(Tester<dist_t> *rt, Config *config) {
     config->test_enter_point_dis = 1;
+    cout << "begin testing\n";
     rt->test();
     // rt->test_faiss();
     // rt->test_waste_cands();
@@ -68,10 +69,12 @@ int main(int argc, char *argv[]) {
         begin_tst(rt, config);
 
     } else if (opt.dataName == "gist") {
+
         data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "gist");
         query_data_loader = new DataLoader("f", 0, opt.query_data_path, "gist");
         gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
         hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+
 
         auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
         begin_tst(rt, config);

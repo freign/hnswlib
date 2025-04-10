@@ -66,6 +66,7 @@ public:
     void test() {
 
         build_graph();
+
         config->tag_build_graph_completed = 1;
         config->statis_recursive_len = 0;
         config->use_dir_vector = 0;
@@ -159,7 +160,8 @@ public:
         for (int i = 0; i < data_loader->get_elements(); i++) {
             alg_hnsw->addPoint(data_loader->point_data(i), i);
         }
-        alg_hnsw->calc_neighbor_dist();
+        
+        //alg_hnsw->calc_neighbor_dist();
         // vector<int> tem;
         // for (int i = 0; i < max_elements; i++) {
         //     if (alg_hnsw->element_levels_[i] == 1) tem.push_back(i);

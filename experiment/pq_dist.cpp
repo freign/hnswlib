@@ -19,15 +19,25 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
 
     // pq_dist_cache.resize(m * code_nums);
     pq_dist_cache_data = (float*)aligned_alloc(64, sizeof(float) * table_size);
+    pq_dist_cache_data_uint8 = (uint8_t*)aligned_alloc(64, sizeof(uint8_t) * table_size);
+    if (pq_dist_cache_data == nullptr || pq_dist_cache_data_uint8 == nullptr) {
+        perror("Not enough memory for pq_dist_cache_data");
+        exit(-1);
+    }
+    
     qdata.resize(d);
 
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
+    simd_registers = std::move(std::make_unique<__m512i[]>(this->m / 4));
 
 }
 
 PQDist::~PQDist() {
     if (pq_dist_cache_data != nullptr)
-        delete []pq_dist_cache_data;
+        free(pq_dist_cache_data);
+    if (pq_dist_cache_data_uint8 != nullptr)
+        free(pq_dist_cache_data_uint8);
+    
 }
 
 void PQDist::train(int N, std::vector<float> &xb) {
@@ -144,33 +154,35 @@ void PQDist::load_query_data(const float *_qdata, bool _use_cache) {
     clear_pq_dist_cache();
     use_cache = _use_cache;
 }
+
 void PQDist::load_query_data_and_cache(const float *_qdata) {
     memcpy(qdata.data(), _qdata, sizeof(float) * d);
     clear_pq_dist_cache();
     use_cache = true;
-
+    maxx = 0;
+    minx = 1 << 10;
 
     for(int i = 0; i < m * code_nums; i++) {
         pq_dist_cache_data[i] = calc_dist(d_pq, get_centroid_data(i / code_nums, i % code_nums), qdata.data() + (i / code_nums) * d_pq);
-
-        // maxx = max(maxx, pq_dist_cache[i]);
-        // minn = min(minn, pq_dist_cache[i]);
+        maxx = std::max(maxx, pq_dist_cache_data[i]);
+        minx = std::min(minx, pq_dist_cache_data[i]);
     }
 
     // pq_dist_cache_data = pq_dist_cache.data();
     // this->offset = minn;
     // this->scale = (maxx - minn) / 255.0;
-    // for(int i = 0; i < m * code_nums; i++) {
-    //     pq_dist_cache_data_ui8[i] = std::round((pq_dist_cache[i] - offset) / scale);
-    // }
-
-
-    _mm_prefetch(pq_dist_cache_data, _MM_HINT_NTA);
+    scale = (maxx - minx) / 255.0;
+    for(int i = 0; i < m * code_nums; i++) {
+     pq_dist_cache_data_uint8[i] = std::round((pq_dist_cache_data[i] - minx) / scale);
+    }
+    
+    set_registers();
+   /*  _mm_prefetch(pq_dist_cache_data, _MM_HINT_NTA);
 
     size_t prefetch_size = 128;
     for (int i = 0; i < table_size * 4; i += prefetch_size / 4) {
         _mm_prefetch(pq_dist_cache_data + i, _MM_HINT_NTA);
-    }
+    } */
 
 }
 float PQDist::calc_dist_pq_(int data_id, float *qdata, bool use_cache=true) {
@@ -272,7 +284,7 @@ void PQDist::load(string filename) {
     table_size = m * code_nums;
 
     if (pq_dist_cache_data != nullptr)
-        delete []pq_dist_cache_data;
+        free(pq_dist_cache_data);
     pq_dist_cache_data = (float*)aligned_alloc(64, sizeof(float) * table_size);
 
     // pq_dist_cache.resize(m * code_nums);
@@ -349,10 +361,63 @@ void PQDist::extract_centroid_ids(int n) {
     }
 }
 
-void PQDist::extract_neighbor_centroid_ids(vector<uint8_t> &result, int *neighbors, int size) {
-    result.resize(m*nbits/8 * size);
+void PQDist::extract_neighbor_centroid_ids(uint8_t* &result, int *neighbors, int size) {
+    result = (uint8_t*)aligned_alloc(64, sizeof(uint8_t) * ((size + 15) & (~15)) * m * nbits / 8);
+    memset(result, 0, sizeof(uint8_t) * ((size + 15) & (~15)) * m * nbits / 8);
     for (int i = 0; i < size; i++) {
         int neighbor = neighbors[i];
-        memcpy(result.data() + i*m*nbits/8, centroid_ids.data() + neighbor*m*nbits/8, m*nbits/8);
+        memcpy(result + i*m*nbits/8, centroid_ids.data() + neighbor*m*nbits/8, m*nbits/8);
     }
+}
+
+void PQDist::calc_dist_ultimate(uint8_t *encodes, int size, float *dists) {
+    __m512i mask = _mm512_set1_epi8(0x0F);
+    __m512 scale_f = _mm512_set1_ps(scale);
+    __m512 minx_f = _mm512_set1_ps(minx);
+    __m512i index = _mm512_setzero_si512();
+    __m512i dist = _mm512_setzero_si512();
+    int batch_size = 16;
+    int scale_size = (size + 15) & (~15);
+
+    // print_m512i_uint8(simd_registers[20]);
+    for (int b = 0; b < scale_size; b += batch_size)
+    {
+        uint8_t *b_encodes = encodes + b * m * nbits / 8;
+        float *b_dists = dists + b;
+        
+
+        __m512i acc = _mm512_setzero_si512();
+        for (int i = 0; i < m; i += 8)
+        {
+
+            index = _mm512_load_si512(b_encodes + i * batch_size * nbits / 8);
+            // print_m512i_uint8(index);
+            __m512i partial_id = _mm512_and_si512(index, mask);
+            // print_m512i_uint8(partial_id);
+
+            __m512i dist = _mm512_shuffle_epi8(simd_registers[2 * (i / 8)], partial_id);
+            // print_m512i_uint8(dist);
+            extract_and_upcast_and_add(acc, dist);
+            // 饱和加法
+            // dist = _mm512_adds_epu8(dist, partial_dist);
+            // 将index右移4位。
+            index = _mm512_srli_epi16(index, 4);
+            partial_id = _mm512_and_si512(index, mask);
+            // print_m512i_uint8(partial_id);
+            dist = _mm512_shuffle_epi8(simd_registers[2 * (i / 8) + 1], partial_id);
+            // print_m512i_uint8(dist);
+            extract_and_upcast_and_add(acc, dist);
+        }
+
+        __m512 acc_f = _mm512_cvtepi32_ps(acc);
+
+        acc_f = _mm512_mul_ps(acc_f, scale_f);
+        acc_f = _mm512_add_ps(acc_f, minx_f);
+        // 将acc存入dists
+        _mm512_store_ps(b_dists, acc_f);
+
+    }
+
+    
+
 }

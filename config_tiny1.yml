@@ -1,0 +1,9 @@
+use_pq 1
+m 192
+nbits 4
+n 1000000
+pq_dir /root/tiny_opq/
+train_dir /root/tiny_opq/train.fvecs
+test_dir /root/tiny_opq/test.fvecs
+plot_dir /root/tiny_opq
+dataset tiny

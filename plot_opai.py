@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import os
-import bisect
 
 def extract_data(file_path):
     ef_list = []
@@ -17,18 +16,13 @@ def extract_data(file_path):
                 ef_list.append(ef)
                 recall_list.append(recall)
                 latency_list.append(latency_us)
-    i = bisect.bisect_left(recall_list, 0.8)
-    print(i)
-    ef_list = ef_list[i:]
-    recall_list = recall_list[i:]
-    latency_list = latency_list[i:]
 
     qps_list = [1e6 / t for t in latency_list]
     return ef_list, recall_list, qps_list
 
 # 读取 config
 plot_dir = './'
-with open('config_sift.yml', 'r') as file:
+with open('config_opai0.yml', 'r') as file:
     for line in file:
         line = line.strip()
         if line.startswith('plot_dir '):
@@ -36,8 +30,8 @@ with open('config_sift.yml', 'r') as file:
 
 # 要画的文件和标签
 inputs = [
-    ('/root/sift_opq/result_1000000_10oro_2.res', 'HNSW', 'red'),
-    ('/root/sift_opq/result_1000000_10_pq64_4_optim.res', 'HNSWPQ64-4', 'blue')
+    ('/root/opai_opq/result_1000000_10oro.res', 'HNSW', 'red'),
+    ('/root/opai_opq/result_1000000_10_pq192_4.res', 'HNSWPQ192-4', 'blue')
 ]
 
 # 创建横向 1x3 子图

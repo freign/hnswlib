@@ -663,22 +663,22 @@ namespace hnswlib
 
             visited_list_pool_->releaseVisitedList(vl);
 
-            if (config->use_PQ)
-            {
+            //重要：：：重排序。
+
+            /* if (config->use_PQ) {
                 std::vector<int> candidates;
                 candidates.reserve(top_candidates.size());
-                while (top_candidates.size())
-                {
+                while (top_candidates.size()) {
                     candidates.push_back(top_candidates.top().second);
                     top_candidates.pop();
                 }
-                for (auto candidate_id : candidates)
-                {
+                for (auto candidate_id: candidates) {
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
                     top_candidates.emplace(dist, candidate_id);
                 }
-            }
+            } */
+            
             if(config->use_PQ)
             {
                 if(dists != nullptr)

@@ -1,0 +1,9 @@
+use_pq 1
+m 96
+nbits 4
+n 1000000
+pq_dir /root/msmarco_opq/
+train_dir /root/msmarco_opq/train.fvecs
+test_dir /root/msmarco_opq/test.fvecs
+plot_dir /root/msmarco_opq
+dataset msmarco

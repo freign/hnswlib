@@ -1,0 +1,9 @@
+use_pq 1
+m 64
+nbits 4
+n 1000000
+pq_dir /root/deep_opq/
+train_dir /root/deep_opq/train.fvecs
+test_dir /root/deep_opq/test.fvecs
+plot_dir /root/deep_opq
+dataset deep

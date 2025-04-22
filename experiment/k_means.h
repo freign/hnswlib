@@ -55,7 +55,6 @@ protected:
 
     // 质心
     vector<vector<dist_t> > centroids;
-
     // assignments: [0, k)
     vector<int> assignments;
     vector<vector<int> > clusters;

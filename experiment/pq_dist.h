@@ -25,7 +25,7 @@ public:
     size_t table_size;
     std::vector<uint8_t> codes;
     std::vector<float> centroids;
-    std::unique_ptr<faiss::IndexPQ> indexPQ;
+    //std::unique_ptr<faiss::IndexPQ> indexPQ;
     std::unique_ptr<hnswlib::SpaceInterface<float>> space;
 
     void train(int N, std::vector<float> &xb);
@@ -96,19 +96,27 @@ public:
         // 设置寄存器的值
 
         uint8_t *temp_buffers = (uint8_t *)aligned_alloc(64, sizeof(uint8_t) * 4 * (1 << nbits));
+        memset(temp_buffers, 0, sizeof(uint8_t) * 4 * (1 << nbits));
         for (int i = 0; i < m; i += 8)
         {
     
             memcpy(temp_buffers, pq_dist_cache_data_uint8 + i * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 2) * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 4) * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 6) * code_nums, sizeof(uint8_t) * code_nums);
+            if(i + 2 < m)
+                memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 2) * code_nums, sizeof(uint8_t) * code_nums);
+            if((i + 4 < m))
+                memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 4) * code_nums, sizeof(uint8_t) * code_nums);
+            if(i + 6 < m)
+                memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 6) * code_nums, sizeof(uint8_t) * code_nums);
             simd_registers[2 * i / 8] = _mm512_load_si512(temp_buffers);
             // print_m512i_uint8(simd_registers[i / 8]);
-            memcpy(temp_buffers, pq_dist_cache_data_uint8 + (i + 1) * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 3) * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 5) * code_nums, sizeof(uint8_t) * code_nums);
-            memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 7) * code_nums, sizeof(uint8_t) * code_nums);
+            if(i + 1 < m)
+                memcpy(temp_buffers, pq_dist_cache_data_uint8 + (i + 1) * code_nums, sizeof(uint8_t) * code_nums);
+            if(i + 3 < m)
+                memcpy(temp_buffers + code_nums, pq_dist_cache_data_uint8 + (i + 3) * code_nums, sizeof(uint8_t) * code_nums);
+            if( i + 5 < m)
+                memcpy(temp_buffers + 2 * code_nums, pq_dist_cache_data_uint8 + (i + 5) * code_nums, sizeof(uint8_t) * code_nums);
+            if(i + 7 < m)
+                memcpy(temp_buffers + 3 * code_nums, pq_dist_cache_data_uint8 + (i + 7) * code_nums, sizeof(uint8_t) * code_nums);
             simd_registers[2 * i / 8 + 1] = _mm512_load_si512(temp_buffers);
         }
         free(temp_buffers);

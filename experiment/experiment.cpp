@@ -89,7 +89,64 @@ int main(int argc, char *argv[]) {
 
         auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
         begin_tst(rt, config);
-    } else {
+    }
+    else if(opt.dataName == "mnist") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "mnist");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "mnist");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 784);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    }
+    else if(opt.dataName == "deep") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "deep");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "deep");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 256);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    }
+    else if(opt.dataName == "opai") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "opai");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "opai");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 1536);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    }
+    else if(opt.dataName == "msmarco") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "msmarco");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "msmarco");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 768);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+
+    }
+    else if(opt.dataName == "nuswide") {
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "nuswide");
+        query_data_loader = new DataLoader("f", 0, opt.query_data_path, "nuswide");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 500);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    }
+    else if(opt.dataName == "tiny"){
+        data_loader = new DataLoader("f", opt.maxElements, opt.point_data_path, "tiny");
+        query_data_loader = new DataLoader("f", 1000, opt.query_data_path, "tiny");
+        gt_loader = new GroundTruth::GT_Loader(opt.dataDir, data_loader, query_data_loader);
+        assert(data_loader->get_dim() == 384);
+        hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(data_loader->get_dim());
+        auto *rt = new Tester<float>(&opt, data_loader, query_data_loader, gt_loader, space, "f", M, config);
+        begin_tst(rt, config);
+    }
+    else {
         cout << "data name error\n";
     }
 

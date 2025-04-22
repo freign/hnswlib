@@ -28,7 +28,7 @@ def extract_data(file_path):
 
 # 读取 config
 plot_dir = './'
-with open('config_sift.yml', 'r') as file:
+with open('config_tiny0.yml', 'r') as file:
     for line in file:
         line = line.strip()
         if line.startswith('plot_dir '):
@@ -36,8 +36,8 @@ with open('config_sift.yml', 'r') as file:
 
 # 要画的文件和标签
 inputs = [
-    ('/root/sift_opq/result_1000000_10oro_2.res', 'HNSW', 'red'),
-    ('/root/sift_opq/result_1000000_10_pq64_4_optim.res', 'HNSWPQ64-4', 'blue')
+    ('/root/tiny_opq/result_1000000_10oro.res', 'HNSW', 'red'),
+    ('/root/tiny_opq/result_1000000_10_pq96_4.res', 'HNSWPQ96-4', 'blue')
 ]
 
 # 创建横向 1x3 子图

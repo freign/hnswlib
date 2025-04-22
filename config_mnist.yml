@@ -1,0 +1,9 @@
+use_pq 1
+m 112
+nbits 4
+n 60000
+pq_dir /root/mnist_opq/
+train_dir /root/mnist_opq/train.fvecs
+test_dir /root/mnist_opq/test.fvecs
+plot_dir /root/mnist_opq
+dataset mnist

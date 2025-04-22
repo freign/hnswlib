@@ -80,7 +80,7 @@ void test_vs_recall(
     string result_file_path;
     if(config -> use_PQ) {
         result_file_path = data_dir + "/result_" 
-            + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + "_pq" + std::to_string(m) + "_" + std::to_string(nbits) + ".res";
+            + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + "_pq" + std::to_string(m) + "_" + std::to_string(nbits) + "_noresort.res";
     } else {
         result_file_path = data_dir + "/result_" 
             + std::to_string(data_loader->get_elements()) + "_" + std::to_string(K) + "oro.res";
@@ -96,13 +96,13 @@ void test_vs_recall(
 
     std::vector<size_t> efs;
 
-    for (int i = K; i < 30; i++) {
+    for (int i = K; i < 80; i+=5) {
         efs.push_back(i);
     }
-    for (int i = 30; i < 100; i += 10) {
+    for (int i = 80; i < 200; i += 10) {
         efs.push_back(i);
     }
-    for (int i = 100; i < 500; i += 40) {
+    for (int i = 200; i < 500; i += 40) {
         efs.push_back(i);
     } 
 

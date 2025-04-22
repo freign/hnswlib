@@ -1,0 +1,9 @@
+use_pq 1
+m 100
+nbits 4
+n 268643
+pq_dir /root/nuswide_opq/
+train_dir /root/nuswide_opq/train.fvecs
+test_dir /root/nuswide_opq/test.fvecs
+plot_dir /root/nuswide_opq
+dataset nuswide

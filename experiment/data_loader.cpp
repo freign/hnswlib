@@ -49,6 +49,117 @@ namespace DATALOADER
 
             tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
         }
+        else if (data_name == "mnist")
+        {
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (784 * 4 + 4);
+            cout << elements_in_file << endl;
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 784;
+            fseek(file, 4, SEEK_SET);
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "deep")
+        {
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (256 * 4 + 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 256;
+            fseek(file, 4, SEEK_SET);
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "opai")
+        {
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (1536 * 4 + 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 1536;
+            fseek(file, 4, SEEK_SET);
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if(data_name == "msmarco"){
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (768 * 4 + 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 768;
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "nuswide")
+        {
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (500 * 4 + 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            cout << "elements in file: " << elements_in_file << endl;
+            dim = 500;
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if(data_name == "tiny")
+        {
+            offset_per_elem = 4;
+            uint32_t elements_in_file = file_size / (384 * 4 + 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 384;
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "yahoo")
+        {
+            offset_per_elem = 0;
+            uint32_t elements_in_file = file_size / (128 * 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 128;
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "yandex")
+        {
+            offset_per_elem = 0;
+            uint32_t elements_in_file = file_size / (128 * 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 128;
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
+        else if (data_name == "glove")
+        {
+            offset_per_elem = 0;
+            uint32_t elements_in_file = file_size / (300 * 4);
+            if (_max_elements == 0)
+                elements = elements_in_file;
+            else
+                elements = std::min(_max_elements, elements_in_file);
+            dim = 300;
+
+            tot_data_size = 1ll * elements * (dim * data_type_len + offset_per_elem) - offset_per_elem;
+        }
         else
         {
 

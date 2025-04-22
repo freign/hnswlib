@@ -103,6 +103,9 @@ public:
     }
     double calc_recall(std::vector<uint32_t> &knn, int id, int k) {
         auto gt = get_knn_gt(id);
+        //fordebug
+        
+        
         int correct = 0;
         for (int i = 0; i < k; i++) {
             for (auto nn: knn) {

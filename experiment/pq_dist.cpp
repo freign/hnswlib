@@ -7,7 +7,7 @@
 using namespace std;
 
 PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
-    indexPQ = std::move(std::make_unique<faiss::IndexPQ>(d, m, nbits));
+    //indexPQ = std::move(std::make_unique<faiss::IndexPQ>(d, m, nbits));
     code_nums = 1 << nbits;
     d_pq = _d / _m;
     table_size = m * code_nums;
@@ -28,7 +28,7 @@ PQDist::PQDist(int _d, int _m, int _nbits) :d(_d), m(_m), nbits(_nbits) {
     qdata.resize(d);
 
     space = std::move(unique_ptr<hnswlib::SpaceInterface<float>> (new hnswlib::L2Space(d_pq)));
-    simd_registers = std::move(std::make_unique<__m512i[]>(this->m / 4));
+    simd_registers = std::move(std::make_unique<__m512i[]>(((this->m + 7) / 8) * 2));
 
 }
 
@@ -41,12 +41,12 @@ PQDist::~PQDist() {
 }
 
 void PQDist::train(int N, std::vector<float> &xb) {
-    indexPQ->train(N, xb.data());
+    /* indexPQ->train(N, xb.data());
     std::cout << "code size = " << indexPQ->code_size << "\n";
     codes.resize(N * indexPQ->code_size);
     indexPQ->sa_encode(N, xb.data(), codes.data());
 
-    centroids.assign(indexPQ->pq.centroids.begin(), indexPQ->pq.centroids.end());
+    centroids.assign(indexPQ->pq.centroids.begin(), indexPQ->pq.centroids.end()); */
 }
 
 // 获取每个quantizer对应的质心id
@@ -371,6 +371,7 @@ void PQDist::extract_neighbor_centroid_ids(uint8_t* &result, int *neighbors, int
 }
 
 void PQDist::calc_dist_ultimate(uint8_t *encodes, int size, float *dists) {
+
     __m512i mask = _mm512_set1_epi8(0x0F);
     __m512 scale_f = _mm512_set1_ps(scale);
     __m512 minx_f = _mm512_set1_ps(minx);

@@ -1,0 +1,9 @@
+use_pq 1
+m 768
+nbits 4
+n 1000000
+pq_dir /root/opai_opq/
+train_dir /root/opai_opq/train.fvecs
+test_dir /root/opai_opq/test.fvecs
+plot_dir /root/opai_opq
+dataset opai

@@ -80,6 +80,7 @@ public:
         int n;
 
         ifstream pq_cfg(opt_->pq_cfg_file);
+        cout << opt_->pq_cfg_file << endl;
         string pq_option_name;
         if (!pq_cfg.is_open()) {
             cerr << "pq cfg read fail: " << opt_->pq_cfg_file << "\n";
@@ -113,6 +114,8 @@ public:
             // load from file
             // pq_dir = "/share/ann_benchmarks/gist/";
             string pq_file = pq_dir + "encoded_data_" + to_string(n) + "_" + to_string(m) + "_" + to_string(nbits);
+            cout << pq_file << endl;
+
             // string pq_file = pq_dir + "encoded_data_100000_" + to_string(m) + "_" + to_string(nbits);
 
             // string pq_file = "../PQ/pq_" + to_string(data_loader->get_elements()) + ".txt";

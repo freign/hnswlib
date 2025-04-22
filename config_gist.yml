@@ -1,7 +1,7 @@
 use_pq 1
 m 120
 nbits 4
-n 10000
+n 1000000
 pq_dir /root/gist_opq/
 train_dir /root/gist_opq/train.fvecs
 test_dir /root/gist_opq/test.fvecs
